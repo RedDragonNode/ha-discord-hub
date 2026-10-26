@@ -28,7 +28,7 @@ It can run next to the built-in `discord` integration. Both may use the same bot
 1. **HACS:** *HACS → ⋮ → Custom repositories*, add `https://github.com/RedDragonNode/ha-discord-hub` as an **Integration**, install **Discord Hub** and restart Home Assistant.
 2. **Create a bot** (only if you want a bot, a webhook works without):
    1. In the [Discord Developer Portal](https://discord.com/developers/applications) create an application, reset the **token** on the **Bot** page and copy it. Treat the token like a password.
-   2. Under *OAuth2 → URL Generator* choose the scope `bot` and tick the permissions **View Channels, Send Messages, Embed Links, Attach Files, Read Message History**. Forum posts also need **Send Messages in Threads** (the permission “Send Messages” is called “Create Posts” in forums), changing threads needs **Manage Threads**, reactions need **Add Reactions**, pinning and deleting other people's messages need **Manage Messages**.
+   2. Under *OAuth2 → URL Generator* choose the scope `bot` and tick the permissions **View Channels, Send Messages, Embed Links, Attach Files, Read Message History**. Forum posts also need **Send Messages in Threads** (the permission “Send Messages” is called “Create Posts” in forums), changing threads needs **Manage Threads**, reactions need **Add Reactions**, pinning and deleting other people's messages need **Manage Messages** (newer Discord versions also have a separate permission for pinning).
    3. Invite the bot to your server with the generated link.
 3. **Integration:** *Settings → Devices & services → Add integration → Discord Hub*, then choose **Bot (token)** or **Webhook (address)**. You enter the token or address there yourself; they live only in Home Assistant's storage (not in the repository, not in diagnostics, not in the log).
 
@@ -134,7 +134,7 @@ Every entry of `files` is a text or an object:
 | camera snapshot | `camera.fuchsrevier` | `camera: …` |
 | media source (local) | `media-source://media_source/local/clip.mp4` | `media: …` |
 
-An object can also take `filename` and `spoiler: true`. Local paths must be in `allowlist_external_dirs` and web addresses in `allowlist_external_urls` (as with the built-in integration). How large a file may be is decided by the server (boost level): if Discord refuses it, the action says so explicitly instead of silently dropping it.
+An object can also take `filename` and `spoiler: true`. Local paths must be in `allowlist_external_dirs` and web addresses in `allowlist_external_urls` (as with the built-in integration). **Media sources need neither:** files from the media folder (for example recordings under `/media/Aufnahmen`) work without any configuration as `media-source://media_source/local/Aufnahmen/video.mp4`. How large a file may be is decided by the server (boost level): if Discord refuses it, the action says so explicitly instead of silently dropping it.
 
 ## Limits
 

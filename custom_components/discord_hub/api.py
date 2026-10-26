@@ -19,7 +19,7 @@ import aiohttp
 _LOGGER = logging.getLogger(__name__)
 
 API_BASE = "https://discord.com/api/v10"
-USER_AGENT = "DiscordBot (https://github.com/RedDragonNode/ha-discord-hub, 0.1.0)"
+USER_AGENT = "DiscordBot (https://github.com/RedDragonNode/ha-discord-hub, 0.1.1)"
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 MAX_ATTEMPTS = 4

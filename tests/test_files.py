@@ -112,7 +112,8 @@ async def test_camera_snapshot(hass):
 
 
 async def test_local_media_source(hass, tmp_path):
-    hass.config.allowlist_external_dirs = {str(tmp_path)}
+    # kein allowlist_external_dirs nötig: die Medienquelle ist schon auf die Medienordner beschränkt
+    assert not hass.config.is_allowed_path(str(tmp_path / "clip.mp4"))
     clip = tmp_path / "clip.mp4"
     clip.write_bytes(b"clip")
     play = SimpleNamespace(path=clip, url="/media/local/clip.mp4", mime_type="video/mp4")

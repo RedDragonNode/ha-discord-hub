@@ -28,7 +28,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 1. **HACS:** *HACS → ⋮ → Benutzerdefinierte Repositories* `https://github.com/RedDragonNode/ha-discord-hub` als **Integration** hinzufügen, **Discord Hub** installieren und Home Assistant neu starten.
 2. **Bot anlegen** (nur nötig, wenn du einen Bot nutzen willst, ein Webhook geht auch ohne):
    1. Im [Discord Developer Portal](https://discord.com/developers/applications) eine neue Anwendung anlegen, auf der Seite **Bot** den **Token** zurücksetzen und kopieren. Den Token behandelst du wie ein Passwort.
-   2. Unter *OAuth2 → URL Generator* den Bereich `bot` wählen und die Berechtigungen **Kanäle ansehen, Nachrichten senden, Links einbetten, Dateien anhängen, Nachrichtenverlauf anzeigen** ankreuzen. Für Forum-Posts kommt **Nachrichten in Threads senden** dazu (die Berechtigung „Nachrichten senden“ heißt in Foren „Beiträge erstellen“), für Threads ändern **Threads verwalten**, für Reaktionen **Reaktionen hinzufügen**, für Anheften und fremde Nachrichten löschen **Nachrichten verwalten**.
+   2. Unter *OAuth2 → URL Generator* den Bereich `bot` wählen und die Berechtigungen **Kanäle ansehen, Nachrichten senden, Links einbetten, Dateien anhängen, Nachrichtenverlauf anzeigen** ankreuzen. Für Forum-Posts kommt **Nachrichten in Threads senden** dazu (die Berechtigung „Nachrichten senden“ heißt in Foren „Beiträge erstellen“), für Threads ändern **Threads verwalten**, für Reaktionen **Reaktionen hinzufügen**, für Anheften und fremde Nachrichten löschen **Nachrichten verwalten** (neuere Discord-Versionen haben fürs Anheften auch eine eigene Berechtigung).
    3. Mit dem erzeugten Link den Bot auf deinen Server einladen.
 3. **Integration:** *Einstellungen → Geräte & Dienste → Integration hinzufügen → Discord Hub*, dann **Bot (Token)** oder **Webhook (Adresse)** wählen. Token und Adressen trägst du dort selbst ein, sie liegen nur im Speicher von Home Assistant (nicht im Repo, nicht in der Diagnose, nicht im Protokoll).
 
@@ -134,7 +134,7 @@ Jeder Eintrag in `files` ist ein Text oder ein Objekt:
 | Schnappschuss einer Kamera | `camera.fuchsrevier` | `camera: …` |
 | Medienquelle (lokal) | `media-source://media_source/local/clip.mp4` | `media: …` |
 
-Im Objekt gehen außerdem `filename` und `spoiler: true`. Lokale Pfade müssen in `allowlist_external_dirs` stehen und Web-Adressen in `allowlist_external_urls` (wie bei der eingebauten Integration). Wie groß eine Datei sein darf, bestimmt der Server (Boost-Stufe): Lehnt Discord sie ab, meldet die Aktion das ausdrücklich, statt sie still zu verwerfen.
+Im Objekt gehen außerdem `filename` und `spoiler: true`. Lokale Pfade müssen in `allowlist_external_dirs` stehen und Web-Adressen in `allowlist_external_urls` (wie bei der eingebauten Integration). **Medienquellen brauchen das nicht:** Dateien aus dem Medienordner (zum Beispiel Aufnahmen unter `/media/Aufnahmen`) gehen ohne Konfiguration als `media-source://media_source/local/Aufnahmen/video.mp4`. Wie groß eine Datei sein darf, bestimmt der Server (Boost-Stufe): Lehnt Discord sie ab, meldet die Aktion das ausdrücklich, statt sie still zu verwerfen.
 
 ## Grenzen
 

@@ -55,8 +55,8 @@ def _read_file(path: str) -> bytes:
     return Path(path).read_bytes()
 
 
-async def _load_path(hass: HomeAssistant, path: str) -> tuple[str, bytes, str | None]:
-    if not hass.config.is_allowed_path(path):
+async def _load_path(hass: HomeAssistant, path: str, *, check_allowed: bool = True) -> tuple[str, bytes, str | None]:
+    if check_allowed and not hass.config.is_allowed_path(path):
         raise _error("path_not_allowed", path=path)
     try:
         data = await hass.async_add_executor_job(_read_file, path)
@@ -110,7 +110,8 @@ async def _load_media(hass: HomeAssistant, uri: str) -> tuple[str, bytes, str | 
     play = await media_source.async_resolve_media(hass, uri, None)
     if play.path is None:
         raise _error("media_not_local", uri=uri)
-    name, data, _ = await _load_path(hass, str(play.path))
+    # Die Medienquelle beschränkt sich selbst auf die Medienordner, `allowlist_external_dirs` braucht es dafür nicht
+    name, data, _ = await _load_path(hass, str(play.path), check_allowed=False)
     return name, data, play.mime_type
 
 

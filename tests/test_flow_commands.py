@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType
@@ -67,7 +69,13 @@ COMMAND = {
 }
 
 
+def _mock_command_sync(discord):
+    """Nach dem Anlegen lädt sich der Eintrag neu und gleicht die Befehle mit Discord ab."""
+    discord.post(re.compile(r".*/applications/\d+/guilds/\d+/commands$"), json={"id": "9002"})
+
+
 async def _start_command(hass, discord, entry):
+    _mock_command_sync(discord)
     discord.get(f"{API}/users/@me/guilds", json=_guilds("Fuchsbau"))
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "command"), context={"source": SOURCE_USER}
@@ -148,6 +156,7 @@ async def test_the_same_command_twice(hass, discord):
 
 async def test_command_with_two_servers(hass, discord):
     entry = await setup_entry(hass, bot_entry())
+    _mock_command_sync(discord)
     discord.get(f"{API}/users/@me/guilds", json=_guilds("Fuchsbau", "Hasenbau"))
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "command"), context={"source": SOURCE_USER}

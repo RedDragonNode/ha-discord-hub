@@ -167,7 +167,11 @@ class Listener:
     # ------------------------------------------------------------------ Start und Ende
     async def async_start(self) -> None:
         """Befehle auf Discord abgleichen und, wenn eingestellt, die Verbindung aufbauen."""
-        await self.async_sync_commands()
+        try:
+            await self.async_sync_commands()
+        except Exception:
+            # ein Fehler beim Abgleich darf das Hören auf Discord nicht verhindern
+            _LOGGER.exception("Die Befehle ließen sich nicht mit Discord abgleichen")
         if self.enabled:
             self.gateway = GatewayClient(
                 self.runtime.session,

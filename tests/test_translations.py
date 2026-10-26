@@ -73,3 +73,10 @@ def test_every_error_key_used_in_the_code_has_a_text(texts: dict[str, dict[str, 
     assert used, "keine Schlüssel gefunden, die Suche ist kaputt"
     for key in used:
         assert f"exceptions.{key}.message" in texts["en"], key
+
+
+@pytest.mark.parametrize("lang", ["de", "en"])
+def test_no_urls_in_texts(texts: dict[str, dict[str, str]], lang: str) -> None:
+    """Hassfest lehnt Adressen in Übersetzungen ab."""
+    for key, text in texts[lang].items():
+        assert "http" not in text, f"{lang}: {key}"

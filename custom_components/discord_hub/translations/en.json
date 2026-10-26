@@ -44,7 +44,7 @@
     "error": {
       "invalid_auth": "Discord rejects this token. Please copy the bot token again from the Developer Portal.",
       "cannot_connect": "Discord cannot be reached. Please try again in a moment.",
-      "invalid_webhook": "This is not a working webhook address. It looks like https://discord.com/api/webhooks/…"
+      "invalid_webhook": "This is not a working webhook address. Please copy the whole address again from the channel settings."
     },
     "abort": {
       "already_configured": "This bot or webhook is already set up.",

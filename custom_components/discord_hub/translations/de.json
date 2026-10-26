@@ -44,7 +44,7 @@
     "error": {
       "invalid_auth": "Discord lehnt diesen Token ab. Bitte kopiere den Bot-Token noch einmal aus dem Developer Portal.",
       "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal.",
-      "invalid_webhook": "Das ist keine funktionierende Webhook-Adresse. Sie sieht aus wie https://discord.com/api/webhooks/…"
+      "invalid_webhook": "Das ist keine funktionierende Webhook-Adresse. Bitte kopiere die ganze Adresse noch einmal aus den Kanaleinstellungen."
     },
     "abort": {
       "already_configured": "Dieser Bot oder Webhook ist schon eingerichtet.",

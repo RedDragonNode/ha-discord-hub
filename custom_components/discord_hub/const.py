@@ -20,6 +20,33 @@ CONF_USER_ID = "user_id"
 # Untereinträge eines Bots
 SUBENTRY_CHANNEL = "channel"
 SUBENTRY_USER = "user"
+SUBENTRY_COMMAND = "command"
+
+# Optionen eines Bots (Hören auf Discord)
+OPT_LISTEN = "listen"
+OPT_RECEIVE_MESSAGES = "receive_messages"
+OPT_ALLOWED_USERS = "allowed_users"
+OPT_ALLOWED_ROLES = "allowed_roles"
+
+# Felder eines Befehls (Untereintrag)
+CONF_DESCRIPTION = "description"
+CONF_OPTIONS = "options"
+CONF_REPLY = "reply"
+CONF_EPHEMERAL = "ephemeral"
+CONF_EVERYONE = "everyone"
+CONF_USERS = "users"
+CONF_ROLES = "roles"
+
+# Ereignisse auf dem Bus von Home Assistant
+EVENT_COMMAND = f"{DOMAIN}_command"
+EVENT_BUTTON = f"{DOMAIN}_button"
+EVENT_REACTION = f"{DOMAIN}_reaction"
+EVENT_MESSAGE = f"{DOMAIN}_message"
+
+# Wie lange eine Interaktion beantwortet werden kann (Discord erlaubt 15 Minuten)
+INTERACTION_SECONDS = 14 * 60
+# Wie lange ein Befehl auf `respond` wartet, bevor die Integration ihn mit „Erledigt“ beantwortet
+RESPOND_GRACE_SECONDS = 10
 
 # Kanaltypen von Discord
 CHANNEL_TEXT = 0
@@ -41,6 +68,7 @@ SERVICE_PIN_MESSAGE = "pin_message"
 SERVICE_UNPIN_MESSAGE = "unpin_message"
 SERVICE_UPDATE_THREAD = "update_thread"
 SERVICE_LIST_FORUM_TAGS = "list_forum_tags"
+SERVICE_RESPOND = "respond"
 
 # Felder der Dienste
 ATTR_MESSAGE = "message"
@@ -60,6 +88,10 @@ ATTR_EMOJI = "emoji"
 ATTR_ARCHIVED = "archived"
 ATTR_LOCKED = "locked"
 ATTR_NAME = "name"
+ATTR_BUTTONS = "buttons"
+ATTR_INTERACTION_ID = "interaction_id"
+ATTR_EPHEMERAL = "ephemeral"
+ATTR_UPDATE = "update"
 
 # Grenzen von Discord
 MAX_CONTENT = 2000

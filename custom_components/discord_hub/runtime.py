@@ -15,9 +15,11 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, NoReturn
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -65,6 +67,8 @@ class DiscordRuntime:
     entry: ConfigEntry
     api: BotApi | WebhookApi
     hub_device_id: str | None = None
+    listener: Any = None  # der Listener des Bots (listener.py), für Webhooks None
+    registered_commands: dict[str, dict[str, str]] = field(default_factory=dict)  # Server -> {Befehl: ID bei Discord}
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _store: Store[dict[str, Any]] = field(init=False)
     _threads: dict[str, dict[str, str]] = field(default_factory=dict)
@@ -77,6 +81,10 @@ class DiscordRuntime:
     @property
     def is_bot(self) -> bool:
         return isinstance(self.api, BotApi)
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        return async_get_clientsession(self.hass)
 
     @property
     def daily_thread_count(self) -> int:
@@ -93,13 +101,17 @@ class DiscordRuntime:
             for key, rec in (stored.get("threads") or {}).items()
             if isinstance(rec, dict) and rec.get("date", "") >= oldest and rec.get("thread_id")
         }
+        self.registered_commands = {
+            str(guild): {str(name): str(command_id) for name, command_id in commands.items()}
+            for guild, commands in (stored.get("commands") or {}).items()
+        }
 
-    async def _save(self) -> None:
-        await self._store.async_save({"threads": self._threads})
+    async def async_save(self) -> None:
+        await self._store.async_save({"threads": self._threads, "commands": self.registered_commands})
 
     # ------------------------------------------------------------------ Fehler
     @contextlib.contextmanager
-    def _translated(self) -> Iterator[None]:
+    def translated(self) -> Iterator[None]:
         """Fehler von Discord in verständliche Fehler von Home Assistant umwandeln."""
         try:
             yield
@@ -125,6 +137,13 @@ class DiscordRuntime:
             translation_domain=DOMAIN, translation_key=key, translation_placeholders={"details": err.message}
         )
 
+    def _require_listening(self) -> None:
+        """Schaltflächen funktionieren nur, wenn ein Bot sie auch hört."""
+        if not self.is_bot:
+            raise _invalid("bot_only")
+        if self.listener is None or not self.listener.enabled:
+            raise _invalid("buttons_need_listening")
+
     def _bot(self) -> BotApi:
         if not isinstance(self.api, BotApi):
             raise _invalid("bot_only")
@@ -134,7 +153,7 @@ class DiscordRuntime:
     async def dm_channel(self, user_id: str) -> str:
         """Kanal der Direktnachricht an einen Nutzer (wird einmal angelegt und gemerkt)."""
         if user_id not in self._dm_channels:
-            with self._translated():
+            with self.translated():
                 channel = await self._bot().create_dm(user_id)
             self._dm_channels[user_id] = str(channel["id"])
         return self._dm_channels[user_id]
@@ -167,7 +186,7 @@ class DiscordRuntime:
         cached = self._tag_cache.get(channel_id)
         if cached and time.monotonic() - cached[0] < TAG_CACHE_SECONDS:
             return cached[1]
-        with self._translated():
+        with self.translated():
             channel = await self._bot().get_channel(channel_id)
         if channel.get("type") not in FORUM_CHANNELS:
             raise _invalid("not_a_forum")
@@ -198,8 +217,11 @@ class DiscordRuntime:
         *,
         reply_to: str | None = None,
         allow_everyone: bool = False,
+        buttons: list[dict[str, Any]] | None = None,
     ) -> tuple[dict[str, Any], list[Attachment]]:
-        payload = build_payload(message, embeds, reply_to=reply_to, allow_everyone=allow_everyone)
+        if buttons:
+            self._require_listening()
+        payload = build_payload(message, embeds, reply_to=reply_to, allow_everyone=allow_everyone, buttons=buttons)
         attachments = await async_load_attachments(self.hass, files)
         if not payload.get("content") and not payload.get("embeds") and not attachments:
             raise _invalid("empty_message")
@@ -218,13 +240,14 @@ class DiscordRuntime:
         allow_everyone: bool = False,
         username: str | None = None,
         avatar_url: str | None = None,
+        buttons: list[dict[str, Any]] | None = None,
     ) -> dict[str, str]:
         """Eine Nachricht in den Kanal oder in einen seiner Threads schicken."""
         payload, attachments = await self._prepare(
-            message, embeds, files, reply_to=reply_to, allow_everyone=allow_everyone
+            message, embeds, files, reply_to=reply_to, allow_everyone=allow_everyone, buttons=buttons
         )
         async with self._lock:
-            with self._translated():
+            with self.translated():
                 if isinstance(self.api, BotApi):
                     sent = await self.api.create_message(str(thread_id or channel_id), payload, attachments)
                 else:
@@ -271,13 +294,13 @@ class DiscordRuntime:
                     self._reraise(err)
                 else:
                     return {"thread_id": record["thread_id"], "message_id": str(sent["id"]), "created": False}
-            with self._translated():
+            with self.translated():
                 thread_id, message_id = await self._create_thread(
                     channel_id, name, tag_ids, payload, attachments, username, avatar_url
                 )
             if daily:
                 self._threads[store_key] = {"thread_id": thread_id, "date": today}
-                await self._save()
+                await self.async_save()
         return {"thread_id": thread_id, "message_id": message_id, "created": True}
 
     async def _send_to_thread(
@@ -296,7 +319,7 @@ class DiscordRuntime:
 
     def _reraise(self, err: DiscordError) -> NoReturn:
         """Einen Fehler von Discord übersetzt weiterwerfen."""
-        with self._translated():
+        with self.translated():
             raise err
         raise err  # pragma: no cover
 
@@ -333,17 +356,22 @@ class DiscordRuntime:
         message: str | None = None,
         embeds: list[dict[str, Any]] | None = None,
         thread_id: str | None = None,
+        buttons: list[dict[str, Any]] | None = None,
     ) -> dict[str, str]:
-        if message is None and embeds is None:
+        if message is None and embeds is None and buttons is None:
             raise _invalid("nothing_to_change")
-        checked = build_payload(message, embeds)  # prüft Länge und Embeds
+        if buttons:
+            self._require_listening()
+        checked = build_payload(message, embeds, buttons=buttons)  # prüft Länge, Embeds und Schaltflächen
         patch: dict[str, Any] = {}
         if message is not None:
             patch["content"] = checked.get("content", "")
         if embeds is not None:
             patch["embeds"] = checked.get("embeds", [])
+        if buttons is not None:
+            patch["components"] = checked["components"]
         async with self._lock:
-            with self._translated():
+            with self.translated():
                 if isinstance(self.api, BotApi):
                     await self.api.edit_message(str(thread_id or channel_id), str(message_id), patch)
                 else:
@@ -352,7 +380,7 @@ class DiscordRuntime:
 
     async def delete_message(self, channel_id: str | None, message_id: str, *, thread_id: str | None = None) -> None:
         async with self._lock:
-            with self._translated():
+            with self.translated():
                 if isinstance(self.api, BotApi):
                     await self.api.delete_message(str(thread_id or channel_id), str(message_id))
                 else:
@@ -363,7 +391,7 @@ class DiscordRuntime:
     ) -> None:
         api = self._bot()
         async with self._lock:
-            with self._translated():
+            with self.translated():
                 await api.add_reaction(str(thread_id or channel_id), str(message_id), emoji)
 
     async def pin_message(
@@ -371,7 +399,7 @@ class DiscordRuntime:
     ) -> None:
         api = self._bot()
         async with self._lock:
-            with self._translated():
+            with self.translated():
                 await api.pin_message(str(thread_id or channel_id), str(message_id), pinned)
 
     async def update_thread(
@@ -388,7 +416,7 @@ class DiscordRuntime:
         if not patch:
             raise _invalid("nothing_to_change")
         async with self._lock:
-            with self._translated():
+            with self.translated():
                 thread = await api.edit_channel(str(thread_id), patch)
         meta = thread.get("thread_metadata") or {}
         return {

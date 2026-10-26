@@ -15,12 +15,13 @@ from homeassistant.helpers.typing import ConfigType
 
 from .api import BotApi, DiscordAuthError, DiscordError, DiscordNotFoundError, WebhookApi, parse_webhook_url
 from .const import CONF_KIND, CONF_TOKEN, CONF_WEBHOOK_URL, DOMAIN, KIND_BOT
+from .listener import Listener
 from .runtime import DiscordRuntime, threads_store
 from .services import async_register_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.NOTIFY]
+PLATFORMS = [Platform.NOTIFY, Platform.EVENT, Platform.BINARY_SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type DiscordHubConfigEntry = ConfigEntry[DiscordRuntime]
@@ -64,6 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DiscordHubConfigEntry) -
     runtime = DiscordRuntime(hass, entry, api)
     await runtime.async_load()
     if isinstance(api, BotApi):
+        runtime.listener = Listener(runtime)
         runtime.hub_device_id = (
             dr.async_get(hass)
             .async_get_or_create(
@@ -78,6 +80,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DiscordHubConfigEntry) -
         )
     entry.runtime_data = runtime
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if runtime.listener:
+        # Befehle bei Discord abgleichen und auf Discord hören, ohne die Einrichtung aufzuhalten
+        entry.async_create_background_task(hass, runtime.listener.async_start(), f"{DOMAIN} listener")
     # Kanäle kommen und gehen als Untereinträge, Zugangsdaten wechseln: in beiden Fällen neu laden
     entry.async_on_unload(entry.add_update_listener(_reload_on_change))
     return True
@@ -88,6 +93,8 @@ async def _reload_on_change(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DiscordHubConfigEntry) -> bool:
+    if entry.runtime_data.listener:
+        await entry.runtime_data.listener.async_stop()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

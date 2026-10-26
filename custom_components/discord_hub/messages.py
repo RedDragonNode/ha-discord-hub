@@ -89,12 +89,62 @@ def normalize_embed(embed: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+BUTTON_KEYS = ("label", "custom_id", "style", "url", "emoji", "disabled")
+BUTTON_SCHEMA = vol.Schema({vol.Optional(key): object for key in BUTTON_KEYS})
+BUTTON_STYLES = {"primary": 1, "secondary": 2, "success": 3, "danger": 4, "link": 5}
+BUTTONS_PER_ROW = 5
+MAX_BUTTONS = 25
+
+
+def build_components(buttons: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Schaltflächen als Zeilen mit je bis zu fünf Buttons. Eine leere Liste entfernt alle Schaltflächen."""
+    if len(buttons) > MAX_BUTTONS:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="too_many_buttons",
+            translation_placeholders={"limit": str(MAX_BUTTONS)},
+        )
+    built: list[dict[str, Any]] = []
+    try:
+        for button in buttons:
+            style = button.get("style", "primary")
+            kind = style if isinstance(style, int) else BUTTON_STYLES[str(style).lower()]
+            item: dict[str, Any] = {"type": 2, "style": kind}
+            if button.get("label"):
+                item["label"] = str(button["label"])[:80]
+            if emoji := button.get("emoji"):
+                item["emoji"] = {"name": emoji} if isinstance(emoji, str) else dict(emoji)
+            if not item.get("label") and not item.get("emoji"):
+                raise ValueError("label")
+            if kind == BUTTON_STYLES["link"]:
+                if not button.get("url"):
+                    raise ValueError("url")
+                item["url"] = str(button["url"])
+            else:
+                custom_id = str(button.get("custom_id") or "")
+                if not custom_id or len(custom_id) > 100:
+                    raise ValueError("custom_id")
+                item["custom_id"] = custom_id
+            if button.get("disabled"):
+                item["disabled"] = True
+            built.append(item)
+    except (KeyError, TypeError, ValueError, AttributeError) as err:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="invalid_button", translation_placeholders={"details": str(err)}
+        ) from err
+    return [
+        {"type": 1, "components": built[start : start + BUTTONS_PER_ROW]}
+        for start in range(0, len(built), BUTTONS_PER_ROW)
+    ]
+
+
 def build_payload(
     message: str | None,
     embeds: list[dict[str, Any]] | None,
     *,
     reply_to: str | None = None,
     allow_everyone: bool = False,
+    buttons: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Der JSON-Teil einer Nachricht. Erwähnungen von Nutzern und Rollen sind erlaubt, @everyone nur auf Wunsch."""
     payload: dict[str, Any] = {}
@@ -115,6 +165,8 @@ def build_payload(
             )
         payload["embeds"] = [normalize_embed(embed) for embed in embeds]
     payload["allowed_mentions"] = {"parse": ["users", "roles", *(["everyone"] if allow_everyone else [])]}
+    if buttons is not None:
+        payload["components"] = build_components(buttons)
     if reply_to:
         payload["message_reference"] = {"message_id": str(reply_to), "fail_if_not_exists": False}
     return payload

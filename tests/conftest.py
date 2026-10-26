@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 from homeassistant.config_entries import ConfigSubentryData
@@ -24,6 +25,7 @@ from custom_components.discord_hub.const import (
     KIND_BOT,
     KIND_WEBHOOK,
     SUBENTRY_CHANNEL,
+    SUBENTRY_COMMAND,
     SUBENTRY_USER,
 )
 
@@ -57,6 +59,38 @@ def _no_waiting(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("custom_components.discord_hub.api.WAITS", waits, raising=False)
 
 
+class FakeGateway:
+    """Ersatz für das Gateway: verbindet nicht, merkt sich nur, wie es gebaut wurde."""
+
+    instances: ClassVar[list[FakeGateway]] = []
+
+    def __init__(self, session, token, intents, on_dispatch, *, on_status=None, on_fatal=None) -> None:
+        self.token = token
+        self.intents = intents
+        self.on_dispatch = on_dispatch
+        self.on_status = on_status
+        self.on_fatal = on_fatal
+        self.connected = False
+        self.latency = None
+        self.closed = False
+        FakeGateway.instances.append(self)
+
+    async def run(self) -> None:
+        await asyncio.sleep(3600)
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+@pytest.fixture(autouse=True)
+def _fake_gateway(monkeypatch: pytest.MonkeyPatch) -> type[FakeGateway]:
+    """Kein Test baut eine echte Verbindung auf. Die Wartezeit auf `respond` ist lang, solange kein Test sie kürzt."""
+    FakeGateway.instances = []
+    monkeypatch.setattr("custom_components.discord_hub.listener.GatewayClient", FakeGateway)
+    monkeypatch.setattr("custom_components.discord_hub.listener.RESPOND_GRACE_SECONDS", 3600)
+    return FakeGateway
+
+
 def reply(status: int = 200, body: Any = None, headers: dict[str, str] | None = None) -> AiohttpClientMockResponse:
     """Eine Antwort von Discord für `side_effect`."""
     return AiohttpClientMockResponse(
@@ -81,7 +115,7 @@ def payload_of(data: Any) -> dict[str, Any]:
     return json.loads(data._fields[0][2])
 
 
-def bot_entry(**kwargs: Any) -> MockConfigEntry:
+def bot_entry(extra_subentries: list[ConfigSubentryData] | None = None, **kwargs: Any) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="HA Waechter",
@@ -106,9 +140,34 @@ def bot_entry(**kwargs: Any) -> MockConfigEntry:
                 title="Stefan",
                 unique_id=f"dm_{USER_ID}",
             ),
+            *(extra_subentries or []),
         ],
         **kwargs,
     )
+
+
+def command_subentry(**changes: Any) -> ConfigSubentryData:
+    """Der Befehl /status auf Server 1, den Nutzer 555 benutzen darf."""
+    data: dict[str, Any] = {
+        CONF_GUILD_ID: "1",
+        CONF_NAME: "status",
+        "description": "Zeigt den Status",
+        "options": [],
+        "reply": "",
+        "ephemeral": False,
+        "everyone": False,
+        "users": ["555"],
+        "roles": [],
+        **changes,
+    }
+    return ConfigSubentryData(
+        data=data, subentry_type=SUBENTRY_COMMAND, title=f"/{data[CONF_NAME]}", unique_id=f"cmd_1_{data[CONF_NAME]}"
+    )
+
+
+def listening_entry(commands: list[ConfigSubentryData] | None = None, **options: Any) -> MockConfigEntry:
+    """Ein Bot, der auf Discord hört, mit den angegebenen Befehlen."""
+    return bot_entry(commands, options={"listen": True, **options})
 
 
 def webhook_entry() -> MockConfigEntry:

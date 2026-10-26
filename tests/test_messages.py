@@ -79,3 +79,68 @@ def test_payload_limits():
     with pytest.raises(ServiceValidationError) as err:
         build_payload("x", [{"title": "a"}] * 11)
     assert err.value.translation_key == "too_many_embeds"
+
+
+# ---------------------------------------------------------------- Schaltflächen
+def test_buttons_become_rows_of_five():
+    from custom_components.discord_hub.messages import build_components
+
+    rows = build_components([{"label": f"B{i}", "custom_id": f"b{i}"} for i in range(7)])
+    assert [len(row["components"]) for row in rows] == [5, 2]
+    assert rows[0]["type"] == 1
+    assert rows[0]["components"][0] == {"type": 2, "style": 1, "label": "B0", "custom_id": "b0"}
+
+
+def test_button_styles_emoji_link_and_disabled():
+    from custom_components.discord_hub.messages import build_components
+
+    [row] = build_components(
+        [
+            {"label": "Ja", "custom_id": "ja", "style": "success"},
+            {"label": "Nein", "custom_id": "nein", "style": "DANGER", "disabled": True},
+            {"emoji": "✅", "custom_id": "ok", "style": 2},
+            {"label": "Mehr", "style": "link", "url": "https://example.com/x"},
+        ]
+    )
+    yes, no, ok, link = row["components"]
+    assert yes["style"] == 3
+    assert no["style"] == 4
+    assert no["disabled"] is True
+    assert ok["emoji"] == {"name": "✅"}
+    assert link["style"] == 5
+    assert link["url"] == "https://example.com/x"
+    assert "custom_id" not in link
+
+
+def test_no_buttons_removes_them():
+    from custom_components.discord_hub.messages import build_components
+
+    assert build_components([]) == []
+    assert build_payload("x", None, buttons=[])["components"] == []
+    assert "components" not in build_payload("x", None)
+
+
+@pytest.mark.parametrize(
+    "button",
+    [
+        {"custom_id": "a"},  # weder Text noch Emoji
+        {"label": "A"},  # keine custom_id
+        {"label": "A", "custom_id": "x" * 101},
+        {"label": "A", "style": "link"},  # keine Adresse
+        {"label": "A", "custom_id": "a", "style": "bunt"},
+    ],
+)
+def test_invalid_buttons(button):
+    from custom_components.discord_hub.messages import build_components
+
+    with pytest.raises(ServiceValidationError) as err:
+        build_components([button])
+    assert err.value.translation_key == "invalid_button"
+
+
+def test_too_many_buttons():
+    from custom_components.discord_hub.messages import build_components
+
+    with pytest.raises(ServiceValidationError) as err:
+        build_components([{"label": "A", "custom_id": f"a{i}"} for i in range(26)])
+    assert err.value.translation_key == "too_many_buttons"

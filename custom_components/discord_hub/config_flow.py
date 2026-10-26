@@ -11,6 +11,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryFlow,
+    OptionsFlow,
     SubentryFlowResult,
 )
 from homeassistant.core import callback
@@ -26,6 +27,14 @@ from .api import (
     WebhookApi,
     parse_webhook_url,
 )
+from .commands import (
+    InvalidCommand,
+    clean_ids,
+    options_to_text,
+    parse_options,
+    validate_description,
+    validate_name,
+)
 from .const import (
     CHANNEL_ANNOUNCEMENT,
     CHANNEL_CATEGORY,
@@ -34,17 +43,29 @@ from .const import (
     CHANNEL_VOICE,
     CONF_CHANNEL_ID,
     CONF_CHANNEL_TYPE,
+    CONF_DESCRIPTION,
+    CONF_EPHEMERAL,
+    CONF_EVERYONE,
     CONF_GUILD_ID,
     CONF_KIND,
     CONF_NAME,
+    CONF_OPTIONS,
+    CONF_REPLY,
+    CONF_ROLES,
     CONF_TOKEN,
     CONF_USER_ID,
+    CONF_USERS,
     CONF_WEBHOOK_URL,
     DOMAIN,
     KIND_BOT,
     KIND_WEBHOOK,
+    OPT_ALLOWED_ROLES,
+    OPT_ALLOWED_USERS,
+    OPT_LISTEN,
+    OPT_RECEIVE_MESSAGES,
     SELECTABLE_CHANNELS,
     SUBENTRY_CHANNEL,
+    SUBENTRY_COMMAND,
     SUBENTRY_USER,
 )
 
@@ -54,6 +75,30 @@ _SECRET = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSe
 BOT_SCHEMA = vol.Schema({vol.Required(CONF_TOKEN): _SECRET})
 WEBHOOK_SCHEMA = vol.Schema({vol.Required(CONF_NAME): _TEXT, vol.Required(CONF_WEBHOOK_URL): _SECRET})
 USER_SCHEMA = vol.Schema({vol.Required(CONF_NAME): _TEXT, vol.Required(CONF_USER_ID): _TEXT})
+_IDS = selector.TextSelector(selector.TextSelectorConfig(multiple=True))
+_BOOL = selector.BooleanSelector()
+_LONG_TEXT = selector.TextSelector(selector.TextSelectorConfig(multiline=True))
+
+OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(OPT_LISTEN, default=False): _BOOL,
+        vol.Optional(OPT_RECEIVE_MESSAGES, default=False): _BOOL,
+        vol.Optional(OPT_ALLOWED_USERS, default=[]): _IDS,
+        vol.Optional(OPT_ALLOWED_ROLES, default=[]): _IDS,
+    }
+)
+COMMAND_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_NAME): _TEXT,
+        vol.Required(CONF_DESCRIPTION): _TEXT,
+        vol.Optional(CONF_OPTIONS, default=""): _LONG_TEXT,
+        vol.Optional(CONF_REPLY, default=""): _TEXT,
+        vol.Optional(CONF_EPHEMERAL, default=False): _BOOL,
+        vol.Optional(CONF_EVERYONE, default=False): _BOOL,
+        vol.Optional(CONF_USERS, default=[]): _IDS,
+        vol.Optional(CONF_ROLES, default=[]): _IDS,
+    }
+)
 
 
 def _bot_title(me: Mapping[str, Any]) -> str:
@@ -170,7 +215,47 @@ class DiscordHubConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
         if config_entry.data.get(CONF_KIND) != KIND_BOT:
             return {}
-        return {SUBENTRY_CHANNEL: ChannelSubentryFlow, SUBENTRY_USER: UserSubentryFlow}
+        return {
+            SUBENTRY_CHANNEL: ChannelSubentryFlow,
+            SUBENTRY_USER: UserSubentryFlow,
+            SUBENTRY_COMMAND: CommandSubentryFlow,
+        }
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(cls, config_entry: ConfigEntry) -> bool:
+        return config_entry.data.get(CONF_KIND) == KIND_BOT
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return DiscordHubOptionsFlow()
+
+
+class DiscordHubOptionsFlow(OptionsFlow):
+    """Ob der Bot auf Discord hört und wer Buttons und Reaktionen auslösen darf."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            users = clean_ids(user_input.get(OPT_ALLOWED_USERS))
+            roles = clean_ids(user_input.get(OPT_ALLOWED_ROLES))
+            if not all(value.isdigit() for value in (*users, *roles)):
+                errors["base"] = "invalid_ids"
+            else:
+                return self.async_create_entry(
+                    data={
+                        OPT_LISTEN: bool(user_input.get(OPT_LISTEN)),
+                        OPT_RECEIVE_MESSAGES: bool(user_input.get(OPT_RECEIVE_MESSAGES)),
+                        OPT_ALLOWED_USERS: users,
+                        OPT_ALLOWED_ROLES: roles,
+                    }
+                )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(OPTIONS_SCHEMA, user_input or self.config_entry.options),
+            errors=errors,
+        )
 
 
 def _canonical_webhook(parsed: tuple[str, str]) -> str:
@@ -311,3 +396,114 @@ class UserSubentryFlow(_BotSubentryFlow):
             data_schema=self.add_suggested_values_to_schema(USER_SCHEMA, user_input or {}),
             errors=errors,
         )
+
+
+class CommandSubentryFlow(_BotSubentryFlow):
+    """Einen Slash-Befehl anlegen (oder bearbeiten): Name, Optionen, Antwort und wer ihn benutzen darf."""
+
+    _guild: dict[str, Any] | None = None
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        try:
+            guilds = await self._api().get_guilds()
+        except DiscordAuthError:
+            return self.async_abort(reason="invalid_auth")
+        except DiscordError:
+            return self.async_abort(reason="cannot_connect")
+        if not guilds:
+            return self.async_abort(reason="no_guilds")
+        if len(guilds) == 1:
+            self._guild = guilds[0]
+            return await self.async_step_command()
+        if user_input is not None:
+            self._guild = next(g for g in guilds if str(g["id"]) == user_input[CONF_GUILD_ID])
+            return await self.async_step_command()
+        options = [selector.SelectOptionDict(value=str(g["id"]), label=g["name"]) for g in guilds]
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_GUILD_ID): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
+                    )
+                }
+            ),
+        )
+
+    async def async_step_command(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        assert self._guild is not None
+        guild_id = str(self._guild["id"])
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data, error = self._validate(guild_id, user_input, current_id=None)
+            if error:
+                errors["base"] = error
+            else:
+                return self.async_create_entry(
+                    title=f"/{data[CONF_NAME]}", data=data, unique_id=f"cmd_{guild_id}_{data[CONF_NAME]}"
+                )
+        return self.async_show_form(
+            step_id="command",
+            data_schema=self.add_suggested_values_to_schema(COMMAND_SCHEMA, user_input or {}),
+            errors=errors,
+            description_placeholders={"guild": self._guild["name"]},
+        )
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        subentry = self._get_reconfigure_subentry()
+        guild_id = str(subentry.data[CONF_GUILD_ID])
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data, error = self._validate(guild_id, user_input, current_id=subentry.subentry_id)
+            if error:
+                errors["base"] = error
+            else:
+                return self.async_update_and_abort(
+                    self._get_entry(),
+                    subentry,
+                    title=f"/{data[CONF_NAME]}",
+                    data=data,
+                    unique_id=f"cmd_{guild_id}_{data[CONF_NAME]}",
+                )
+        current = {**subentry.data, CONF_OPTIONS: options_to_text(subentry.data.get(CONF_OPTIONS) or [])}
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(COMMAND_SCHEMA, user_input or current),
+            errors=errors,
+        )
+
+    def _validate(
+        self, guild_id: str, user_input: dict[str, Any], *, current_id: str | None
+    ) -> tuple[dict[str, Any], str | None]:
+        """(Daten des Befehls, Fehlerschlüssel). Bei einem Fehler sind die Daten leer."""
+        try:
+            name = validate_name(user_input[CONF_NAME])
+            description = validate_description(user_input[CONF_DESCRIPTION])
+            options = parse_options(user_input.get(CONF_OPTIONS) or "")
+        except InvalidCommand as err:
+            return {}, str(err)
+        users = clean_ids(user_input.get(CONF_USERS))
+        roles = clean_ids(user_input.get(CONF_ROLES))
+        if not all(value.isdigit() for value in (*users, *roles)):
+            return {}, "invalid_ids"
+        entry = self._get_entry()
+        taken = any(
+            s.unique_id == f"cmd_{guild_id}_{name}" and s.subentry_id != current_id for s in entry.subentries.values()
+        )
+        if taken:
+            return {}, "already_exists"
+        everyone = bool(user_input.get(CONF_EVERYONE))
+        inherited = entry.options.get(OPT_ALLOWED_USERS) or entry.options.get(OPT_ALLOWED_ROLES)
+        if not (everyone or users or roles or inherited):
+            return {}, "no_permission"
+        return {
+            CONF_GUILD_ID: guild_id,
+            CONF_NAME: name,
+            CONF_DESCRIPTION: description,
+            CONF_OPTIONS: options,
+            CONF_REPLY: (user_input.get(CONF_REPLY) or "").strip()[:2000],
+            CONF_EPHEMERAL: bool(user_input.get(CONF_EPHEMERAL)),
+            CONF_EVERYONE: everyone,
+            CONF_USERS: users,
+            CONF_ROLES: roles,
+        }, None

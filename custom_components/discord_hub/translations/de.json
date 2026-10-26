@@ -106,6 +106,65 @@
         "already_configured": "Direktnachrichten an diesen Nutzer sind schon eingerichtet.",
         "invalid_auth": "Discord lehnt den Token des Bots ab. Bitte erneuere ihn zuerst."
       }
+    },
+    "command": {
+      "initiate_flow": {
+        "user": "Befehl hinzufügen",
+        "reconfigure": "Befehl bearbeiten"
+      },
+      "entry_type": "Befehl",
+      "step": {
+        "user": {
+          "title": "Server wählen",
+          "description": "Der Bot ist auf mehreren Servern. Wähle den für den Befehl.",
+          "data": {
+            "guild_id": "Server"
+          }
+        },
+        "command": {
+          "title": "Befehl hinzufügen",
+          "description": "Server: {guild}. Der Befehl erscheint in Discord als /name und löst in Home Assistant ein Ereignis aus. Optionen: eine je Zeile als name:typ:Beschreibung, mit ? hinter dem Namen für freiwillige und einer Auswahl in eckigen Klammern, zum Beispiel modus:text:Betriebsart [auto|an|aus]. Typen: text, ganzzahl, zahl, schalter, nutzer, kanal. Wer ihn benutzen darf: Nutzer- oder Rollen-IDs eintragen oder jeden zulassen. Eine Antwort geht sofort raus. Ohne sie zeigt der Bot „denkt nach“, bis deine Automation mit discord_hub.respond antwortet (nach 10 Sekunden steht dort „Erledigt“).",
+          "data": {
+            "name": "Name (ohne Schrägstrich)",
+            "description": "Beschreibung",
+            "options": "Optionen (eine je Zeile)",
+            "reply": "Sofortige Antwort (optional)",
+            "ephemeral": "Antwort nur für den Nutzer sichtbar",
+            "everyone": "Jeder auf dem Server darf ihn benutzen",
+            "users": "Erlaubte Nutzer (IDs)",
+            "roles": "Erlaubte Rollen (IDs)"
+          }
+        },
+        "reconfigure": {
+          "title": "Befehl bearbeiten",
+          "description": "Änderungen kommen sofort bei Discord an. Optionen: eine je Zeile als name:typ:Beschreibung, mit ? hinter dem Namen für freiwillige.",
+          "data": {
+            "name": "Name (ohne Schrägstrich)",
+            "description": "Beschreibung",
+            "options": "Optionen (eine je Zeile)",
+            "reply": "Sofortige Antwort (optional)",
+            "ephemeral": "Antwort nur für den Nutzer sichtbar",
+            "everyone": "Jeder auf dem Server darf ihn benutzen",
+            "users": "Erlaubte Nutzer (IDs)",
+            "roles": "Erlaubte Rollen (IDs)"
+          }
+        }
+      },
+      "error": {
+        "invalid_name": "Der Name darf nur kleine Buchstaben, Ziffern, - und _ enthalten (bis 32 Zeichen).",
+        "invalid_description": "Die Beschreibung braucht 1 bis 100 Zeichen.",
+        "invalid_options": "Eine Option ist ungültig. Schreibe je Zeile name:typ:Beschreibung, mit den Typen text, ganzzahl, zahl, schalter, nutzer oder kanal.",
+        "too_many_options": "Ein Befehl kann höchstens 5 Optionen haben.",
+        "invalid_ids": "Nutzer- und Rollen-IDs bestehen nur aus Ziffern.",
+        "already_exists": "Diesen Befehl gibt es auf diesem Server schon.",
+        "no_permission": "Lege fest, wer den Befehl benutzen darf: trage Nutzer oder Rollen ein, erlaube jeden oder setze erlaubte Nutzer in den Optionen des Bots."
+      },
+      "abort": {
+        "invalid_auth": "Discord lehnt den Token des Bots ab. Bitte erneuere ihn zuerst.",
+        "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal.",
+        "no_guilds": "Der Bot ist noch auf keinem Server. Lade ihn zuerst mit dem OAuth2-Link aus dem Developer Portal ein.",
+        "reconfigure_successful": "Gespeichert."
+      }
     }
   },
   "services": {
@@ -144,6 +203,10 @@
         "avatar_url": {
           "name": "Adresse des Avatars",
           "description": "Nur Webhooks: das Bild, das bei dieser Nachricht angezeigt wird."
+        },
+        "buttons": {
+          "name": "Schaltflächen",
+          "description": "Buttons unter der Nachricht: eine Liste mit label, custom_id, style (primary, secondary, success, danger oder link), url (bei link), emoji und disabled. Ein Klick löst das Ereignis discord_hub_button aus. Eine leere Liste entfernt die Buttons. Braucht einen Bot, der auf Discord hört."
         }
       }
     },
@@ -212,6 +275,10 @@
         "thread_id": {
           "name": "Thread",
           "description": "ID des Threads, wenn die Nachricht in einem liegt."
+        },
+        "buttons": {
+          "name": "Schaltflächen",
+          "description": "Buttons unter der Nachricht: eine Liste mit label, custom_id, style (primary, secondary, success, danger oder link), url (bei link), emoji und disabled. Ein Klick löst das Ereignis discord_hub_button aus. Eine leere Liste entfernt die Buttons. Braucht einen Bot, der auf Discord hört."
         }
       }
     },
@@ -300,6 +367,36 @@
     "list_forum_tags": {
       "name": "Forum-Tags auflisten",
       "description": "Gibt die Tags eines Forum-Kanals mit ihren IDs zurück (nur Bots)."
+    },
+    "respond": {
+      "name": "Antworten",
+      "description": "Antwortet auf einen Befehl oder einen Button-Klick. Die erste Antwort auf einen Befehl füllt die „denkt nach“-Nachricht, weitere Antworten sind neue Nachrichten. Gibt die Nachrichten-ID zurück.",
+      "fields": {
+        "interaction_id": {
+          "name": "Interaktion",
+          "description": "Die interaction_id aus dem Ereignis des Befehls oder Buttons."
+        },
+        "message": {
+          "name": "Nachricht",
+          "description": "Der Text der Antwort."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "Eine Liste von Embeds, wie bei „Nachricht senden“."
+        },
+        "buttons": {
+          "name": "Schaltflächen",
+          "description": "Buttons unter der Nachricht: eine Liste mit label, custom_id, style (primary, secondary, success, danger oder link), url (bei link), emoji und disabled. Ein Klick löst das Ereignis discord_hub_button aus. Eine leere Liste entfernt die Buttons. Braucht einen Bot, der auf Discord hört."
+        },
+        "ephemeral": {
+          "name": "Nur für den Nutzer sichtbar",
+          "description": "Für weitere Antworten: Nur der Nutzer, der den Befehl benutzt hat, sieht die Nachricht. Die erste Antwort auf einen Befehl folgt der Einstellung des Befehls."
+        },
+        "update": {
+          "name": "Nachricht ändern",
+          "description": "Bei einem Button-Klick: ändert die Nachricht mit dem Button, statt eine neue Antwort zu schicken."
+        }
+      }
     }
   },
   "exceptions": {
@@ -380,6 +477,52 @@
     },
     "invalid_webhook": {
       "message": "Die gespeicherte Webhook-Adresse ist nicht gültig. Bitte gib sie noch einmal ein."
+    },
+    "invalid_button": {
+      "message": "Ein Button ist ungültig: {details}"
+    },
+    "too_many_buttons": {
+      "message": "Eine Nachricht kann höchstens {limit} Buttons haben."
+    },
+    "buttons_need_listening": {
+      "message": "Buttons funktionieren nur, wenn der Bot auf Discord hört. Schalte „Auf Discord hören“ in den Optionen des Bots ein."
+    },
+    "unknown_interaction": {
+      "message": "Diese Interaktion ist unbekannt oder zu alt. Discord erlaubt Antworten 15 Minuten lang."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Auf Discord hören",
+        "description": "Schalte das ein, wenn der Bot Befehle, Button-Klicks und Reaktionen aus Discord empfangen soll. Befehle, die du anlegst, schalten es immer ein. Nachrichten empfangen braucht den „Message Content Intent“ auf der Seite „Bot“ im Developer Portal. Die erlaubten Nutzer und Rollen (IDs) begrenzen, wer Buttons drücken und reagieren darf, eine leere Liste erlaubt jedem. Befehle ohne eigene Liste benutzen diese.",
+        "data": {
+          "listen": "Auf Discord hören",
+          "receive_messages": "Nachrichten empfangen (braucht den Message Content Intent)",
+          "allowed_users": "Erlaubte Nutzer (IDs)",
+          "allowed_roles": "Erlaubte Rollen (IDs)"
+        }
+      }
+    },
+    "error": {
+      "invalid_ids": "Nutzer- und Rollen-IDs bestehen nur aus Ziffern."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Verbunden"
+      }
+    }
+  },
+  "issues": {
+    "intents_missing": {
+      "title": "Discord lehnt die Intents eines Bots ab",
+      "description": "Discord hat die Verbindung von {bot} beendet, weil ein Intent nicht freigeschaltet ist. Schalte auf der Seite „Bot“ im Developer Portal den „Message Content Intent“ ein oder schalte in den Optionen des Bots das Empfangen von Nachrichten aus."
+    },
+    "commands_not_allowed": {
+      "title": "Discord lehnt die Befehle eines Bots ab",
+      "description": "Discord hat sich geweigert, die Befehle von {bot} anzulegen. Lade den Bot noch einmal mit dem Bereich „applications.commands“ ein (OAuth2 URL Generator im Developer Portal)."
     }
   }
 }

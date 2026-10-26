@@ -12,7 +12,7 @@ import yaml
 COMPONENT = Path(__file__).resolve().parents[1] / "custom_components" / "discord_hub"
 TRANSLATIONS = COMPONENT / "translations"
 # Das Frontend liest jede geschweifte Klammer als Platzhalter und meldet einen Fehler, wenn der Wert fehlt.
-ALLOWED_PLACEHOLDERS = {"details", "guild", "known", "length", "limit", "name", "path", "spec", "uri", "url"}
+ALLOWED_PLACEHOLDERS = {"bot", "details", "guild", "known", "length", "limit", "name", "path", "spec", "uri", "url"}
 
 
 def _flatten(node: object, prefix: str = "") -> dict[str, str]:
@@ -72,7 +72,7 @@ def test_every_error_key_used_in_the_code_has_a_text(texts: dict[str, dict[str, 
         used |= set(re.findall(r'_ha_error\(\s*"(\w+)"', code))
     assert used, "keine Schlüssel gefunden, die Suche ist kaputt"
     for key in used:
-        assert f"exceptions.{key}.message" in texts["en"], key
+        assert f"exceptions.{key}.message" in texts["en"] or f"issues.{key}.title" in texts["en"], key
 
 
 @pytest.mark.parametrize("lang", ["de", "en"])

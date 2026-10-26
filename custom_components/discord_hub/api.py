@@ -19,7 +19,7 @@ import aiohttp
 _LOGGER = logging.getLogger(__name__)
 
 API_BASE = "https://discord.com/api/v10"
-USER_AGENT = "DiscordBot (https://github.com/RedDragonNode/ha-discord-hub, 0.1.1)"
+USER_AGENT = "DiscordBot (https://github.com/RedDragonNode/ha-discord-hub, 0.2.0)"
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 MAX_ATTEMPTS = 4
@@ -229,6 +229,18 @@ class BotApi(_Http):
 
     async def edit_channel(self, channel_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         return await self.request("PATCH", f"/channels/{channel_id}", payload=patch)
+
+    # ------------------------------------------------------------------ Befehle und Interaktionen
+    async def upsert_guild_command(self, app_id: str, guild_id: str, definition: dict[str, Any]) -> dict[str, Any]:
+        """Einen Befehl auf einem Server anlegen oder (bei gleichem Namen) aktualisieren. Er gilt sofort."""
+        return await self.request("POST", f"/applications/{app_id}/guilds/{guild_id}/commands", payload=definition)
+
+    async def delete_guild_command(self, app_id: str, guild_id: str, command_id: str) -> None:
+        await self.request("DELETE", f"/applications/{app_id}/guilds/{guild_id}/commands/{command_id}")
+
+    async def interaction_callback(self, interaction_id: str, token: str, payload: dict[str, Any]) -> None:
+        """Auf eine Interaktion antworten (binnen 3 Sekunden): sofort, mit „denkt nach“ oder als Aktualisierung."""
+        await self.request("POST", f"/interactions/{interaction_id}/{token}/callback", payload=payload)
 
 
 class WebhookApi(_Http):

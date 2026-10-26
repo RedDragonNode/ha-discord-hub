@@ -21,6 +21,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 | eine Nachricht ändern, löschen, anheften oder mit einem Emoji versehen | `edit_message`, `delete_message`, `pin_message`, `add_reaction` |
 | einen Thread archivieren, sperren oder umbenennen | `update_thread` |
 | die Tags eines Forums nachsehen | `list_forum_tags` |
+| auf Befehle, Buttons und Reaktionen aus Discord reagieren | Ereignisse `discord_hub_command`, `discord_hub_button`, `discord_hub_reaction`, Antwort mit `respond` |
 | einfach Text schicken wie bei jeder Benachrichtigung | `notify.send_message` auf der Kanal-Entity |
 
 ## Installation
@@ -28,7 +29,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 1. **HACS:** *HACS → ⋮ → Benutzerdefinierte Repositories* `https://github.com/RedDragonNode/ha-discord-hub` als **Integration** hinzufügen, **Discord Hub** installieren und Home Assistant neu starten.
 2. **Bot anlegen** (nur nötig, wenn du einen Bot nutzen willst, ein Webhook geht auch ohne):
    1. Im [Discord Developer Portal](https://discord.com/developers/applications) eine neue Anwendung anlegen, auf der Seite **Bot** den **Token** zurücksetzen und kopieren. Den Token behandelst du wie ein Passwort.
-   2. Unter *OAuth2 → URL Generator* den Bereich `bot` wählen und die Berechtigungen **Kanäle ansehen, Nachrichten senden, Links einbetten, Dateien anhängen, Nachrichtenverlauf anzeigen** ankreuzen. Für Forum-Posts kommt **Nachrichten in Threads senden** dazu (die Berechtigung „Nachrichten senden“ heißt in Foren „Beiträge erstellen“), für Threads ändern **Threads verwalten**, für Reaktionen **Reaktionen hinzufügen**, für Anheften und fremde Nachrichten löschen **Nachrichten verwalten** (neuere Discord-Versionen haben fürs Anheften auch eine eigene Berechtigung).
+   2. Unter *OAuth2 → URL Generator* den Bereich `bot` (für Befehle zusätzlich `applications.commands`) wählen und die Berechtigungen **Kanäle ansehen, Nachrichten senden, Links einbetten, Dateien anhängen, Nachrichtenverlauf anzeigen** ankreuzen. Für Forum-Posts kommt **Nachrichten in Threads senden** dazu (die Berechtigung „Nachrichten senden“ heißt in Foren „Beiträge erstellen“), für Threads ändern **Threads verwalten**, für Reaktionen **Reaktionen hinzufügen**, für Anheften und fremde Nachrichten löschen **Nachrichten verwalten** (neuere Discord-Versionen haben fürs Anheften auch eine eigene Berechtigung).
    3. Mit dem erzeugten Link den Bot auf deinen Server einladen.
 3. **Integration:** *Einstellungen → Geräte & Dienste → Integration hinzufügen → Discord Hub*, dann **Bot (Token)** oder **Webhook (Adresse)** wählen. Token und Adressen trägst du dort selbst ein, sie liegen nur im Speicher von Home Assistant (nicht im Repo, nicht in der Diagnose, nicht im Protokoll).
 
@@ -136,9 +137,93 @@ Jeder Eintrag in `files` ist ein Text oder ein Objekt:
 
 Im Objekt gehen außerdem `filename` und `spoiler: true`. Lokale Pfade müssen in `allowlist_external_dirs` stehen und Web-Adressen in `allowlist_external_urls` (wie bei der eingebauten Integration). **Medienquellen brauchen das nicht:** Dateien aus dem Medienordner (zum Beispiel Aufnahmen unter `/media/Aufnahmen`) gehen ohne Konfiguration als `media-source://media_source/local/Aufnahmen/video.mp4`. Wie groß eine Datei sein darf, bestimmt der Server (Boost-Stufe): Lehnt Discord sie ab, meldet die Aktion das ausdrücklich, statt sie still zu verwerfen.
 
+## Empfangen
+
+Befehle, Button-Klicks und Reaktionen aus Discord kommen als **Ereignisse** in Home Assistant an. Dafür muss der Bot auf Discord hören. Das tut er, sobald du einen Befehl anlegst oder unter *Konfigurieren* des Bots **Auf Discord hören** einschaltest. Der Bot steht dann in Discord auf online, und der Sensor **Verbunden** am Gerät des Bots (unter *Diagnose*) zeigt die Verbindung. Es ist eine ausgehende Verbindung zu Discord, du brauchst weder eine öffentliche Adresse noch einen offenen Port.
+
+| Option unter *Konfigurieren* | Bedeutung |
+|---|---|
+| **Auf Discord hören** | der Bot baut die Verbindung auf, auch wenn er keinen Befehl hat (für Buttons und Reaktionen) |
+| **Nachrichten empfangen** | zusätzlich das Ereignis `discord_hub_message` für Nachrichten. Braucht den **Message Content Intent** (*Developer Portal → Bot → Privileged Gateway Intents*). Fehlt er, beendet Discord die Verbindung, und unter *Reparaturen* steht ein Hinweis |
+| **Erlaubte Nutzer** und **Erlaubte Rollen** (IDs) | begrenzen, wer Buttons drücken und reagieren darf (leer: jeder). Befehle ohne eigene Liste benutzen sie |
+
+### Slash-Befehle
+
+*Discord Hub → Befehl hinzufügen* legt einen Befehl auf einem Server an, er gilt sofort und verschwindet wieder, wenn du ihn löschst. Die Integration fasst nur Befehle an, die sie selbst angelegt hat. Der Bot muss mit dem Bereich `applications.commands` eingeladen sein (*OAuth2 → URL Generator*), sonst meldet ein Hinweis unter *Reparaturen*, dass Discord die Befehle ablehnt.
+
+| Feld | Bedeutung |
+|---|---|
+| **Name**, **Beschreibung** | `/name` und der Text, den Discord dazu zeigt. Name: kleine Buchstaben, Ziffern, `-` und `_` |
+| **Optionen** | eine je Zeile als `name:typ:Beschreibung`. Ein `?` hinter dem Namen macht sie freiwillig, eine Auswahl steht in eckigen Klammern. Typen: `text`, `ganzzahl`, `zahl`, `schalter`, `nutzer`, `kanal`. Beispiel: `modus:text:Betriebsart [auto\|an\|aus]` und `grad?:zahl:Zieltemperatur` (erforderliche Optionen vor den freiwilligen, höchstens fünf) |
+| **Sofortige Antwort** | Text, den der Bot sofort schickt. Leer: Discord zeigt „denkt nach“, bis deine Automation mit `respond` antwortet. Kommt nach 10 Sekunden keine Antwort, steht dort „Erledigt“ |
+| **Antwort nur für den Nutzer sichtbar** | die Antwort sehen nur der, der den Befehl benutzt hat |
+| **Erlaubte Nutzer**, **Erlaubte Rollen**, **Jeder darf** | wer ihn benutzen darf |
+
+**Wer darf, steht fest, bevor etwas passiert:** Ein Befehl ohne Eintrag ist für alle gesperrt (er braucht Nutzer, Rollen, **Jeder darf** oder erlaubte Nutzer in den Optionen des Bots). Wer nicht darf, bekommt eine Antwort nur für sich, und in Home Assistant passiert nichts. Slash-Befehle kann auf einem Server sonst jeder auslösen.
+
+Jeder Befehl löst das Ereignis `discord_hub_command` aus, und seine `event`-Entity am Gerät `/name` meldet „used“ mit denselben Daten als Attributen:
+
+| Feld | Inhalt |
+|---|---|
+| `command` | Name des Befehls |
+| `options` | die Werte der Optionen als `name: wert` (bei `nutzer` und `kanal` die ID) |
+| `interaction_id` | die Interaktion, auf die `respond` antwortet |
+| `user_id`, `user_name`, `roles` | wer es war |
+| `guild_id`, `channel_id`, `entry_id`, `bot_id` | wo, und welcher Bot |
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: discord_hub_command
+    event_data:
+      command: licht
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.spielzimmer
+    data:
+      brightness_pct: "{{ trigger.event.data.options.helligkeit | default(50) }}"
+  - action: discord_hub.respond
+    data:
+      interaction_id: "{{ trigger.event.data.interaction_id }}"
+      message: "Das Licht ist an."
+```
+
+Mit der Entity geht es auch ohne Ereignis-Daten im Trigger: `trigger: event.received`, `target: {entity_id: event.licht}`, `options: {event_type: [used]}`, die Werte stehen dann in `trigger.to_state.attributes`.
+
+### Buttons
+
+`send_message` und `edit_message` nehmen `buttons` an: eine Liste mit `label`, `custom_id` (bis 100 Zeichen), `style` (`primary`, `secondary`, `success`, `danger`, `link`), bei `link` eine `url` statt der `custom_id`, dazu `emoji` und `disabled`. Bis zu fünf je Zeile, höchstens 25. Ein Klick löst `discord_hub_button` aus (mit `custom_id`, `message_id`, `interaction_id` und dem Nutzer) und wird sofort bestätigt. Buttons gehen nur mit einem Bot, der auf Discord hört. Mit `buttons: []` bei `edit_message` verschwinden sie wieder.
+
+```yaml
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      message: "Bewegung im Fuchsbau. Alarm quittieren?"
+      buttons:
+        - {label: "Quittieren", custom_id: "alarm_quittiert", style: "success"}
+```
+
+### `discord_hub.respond`
+
+Antwortet auf einen Befehl oder Button-Klick, bis zu 14 Minuten danach.
+
+| Feld | Bedeutung |
+|---|---|
+| `interaction_id` | aus dem Ereignis |
+| `message`, `embeds`, `buttons` | die Antwort. Die erste Antwort auf einen Befehl füllt die „denkt nach“-Nachricht, weitere sind neue Nachrichten |
+| `ephemeral` | nur für den Nutzer sichtbar (für weitere Antworten, die erste folgt dem Befehl) |
+| `update` | bei einem Button: ändert die Nachricht mit dem Button (zum Beispiel Text ersetzen und `buttons: []`), statt eine neue zu schicken |
+
+### Reaktionen und Nachrichten
+
+`discord_hub_reaction` kommt, wenn jemand eine Reaktion setzt oder entfernt (`action: add` oder `remove`, dazu `emoji`, `emoji_id`, `message_id` und der Nutzer). Reaktionen des Bots selbst werden übergangen. `discord_hub_message` (nur mit **Nachrichten empfangen**) kommt für jede Nachricht eines Menschen mit `content`, `message_id`, `reply_to` und dem Nutzer. Beide folgen den erlaubten Nutzern und Rollen der Optionen.
+
 ## Grenzen
 
-- Der Bot **sendet und verwaltet**. Befehle, Reaktionen und Ereignisse aus Discord in Home Assistant, Status-Sensoren und fertige Meldungen für Spiel Saison, Cam Profile und Ctronics kommen in den nächsten Versionen (siehe unten).
+- Der Bot **sendet, verwaltet und empfängt**. Status-Sensoren und fertige Meldungen für Spiel Saison, Cam Profile und Ctronics kommen in den nächsten Versionen (siehe unten).
 - Ein Webhook kann nicht lesen und nur Nachrichten sowie Forum-Posts erzeugen. Reaktionen, Anheften, Threads ändern und Tag-Namen brauchen einen Bot.
 - Discord begrenzt Anfragen. Die Integration wartet bei einer Bremse bis zu 30 Sekunden und wiederholt dann. Ein Fehler beim Senden einer **neuen** Nachricht wird nicht wiederholt, damit nichts doppelt ankommt.
 
@@ -146,7 +231,6 @@ Im Objekt gehen außerdem `filename` und `spoiler: true`. Lokale Pfade müssen i
 
 | Version | Inhalt |
 |---|---|
-| 0.2 | Empfangen: Slash-Befehle, Buttons und Reaktionen als Ereignisse, erlaubte Nutzer und Rollen je Befehl |
 | 0.3 | Status-Sensoren: Mitglieder, Anwesenheit, Sprachkanäle |
 | 0.4 | Zusammenspiel: Meldungen mit Vorlagen für Spiel Saison, Cam Profile und Ctronics |
 

@@ -241,4 +241,4 @@ async def test_a_webhook_has_no_subentries(hass, discord):
     entry = await setup_entry(hass, webhook_entry())
     assert DiscordHubConfigFlow.async_get_supported_subentry_types(entry) == {}
     bot = await setup_entry(hass, bot_entry())
-    assert set(DiscordHubConfigFlow.async_get_supported_subentry_types(bot)) == {"channel", "user"}
+    assert set(DiscordHubConfigFlow.async_get_supported_subentry_types(bot)) == {"channel", "user", "command"}

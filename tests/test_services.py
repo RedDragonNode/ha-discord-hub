@@ -495,3 +495,45 @@ async def test_bot_only_actions_on_a_webhook(hass, hook, service, data):
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, service, hook.entity, **data)
     assert err.value.translation_key == "bot_only"
+
+
+# ---------------------------------------------------------------- Schaltflächen
+BUTTONS = [{"label": "Erledigt", "custom_id": "erledigt", "style": "success"}]
+
+
+@pytest.fixture
+async def listening_bot(hass, discord):
+    entry = await setup_entry(hass, bot_entry(options={"listen": True}))
+    return SimpleNamespace(entry=entry, text=entity_id(hass, entry, TEXT_ID))
+
+
+async def test_send_message_with_buttons(hass, listening_bot, discord):
+    discord.post(f"{API}/channels/{TEXT_ID}/messages", json={"id": "9", "channel_id": TEXT_ID})
+    await call(hass, "send_message", listening_bot.text, message="Fertig?", buttons=BUTTONS)
+    [(_, _, data, _)] = sent(discord, "POST", f"/channels/{TEXT_ID}/messages")
+    assert data["components"] == [
+        {"type": 1, "components": [{"type": 2, "style": 3, "label": "Erledigt", "custom_id": "erledigt"}]}
+    ]
+
+
+async def test_buttons_need_a_bot_that_listens(hass, bot, discord):
+    with pytest.raises(ServiceValidationError) as err:
+        await call(hass, "send_message", bot.text, message="Fertig?", buttons=BUTTONS)
+    assert err.value.translation_key == "buttons_need_listening"
+
+
+async def test_buttons_are_not_possible_with_a_webhook(hass, discord):
+    entry = await setup_entry(hass, webhook_entry())
+    entity = entity_id(hass, entry, "webhook")
+    with pytest.raises(ServiceValidationError) as err:
+        await call(hass, "send_message", entity, message="Fertig?", buttons=BUTTONS)
+    assert err.value.translation_key == "bot_only"
+
+
+async def test_edit_message_can_replace_and_remove_buttons(hass, listening_bot, discord):
+    discord.patch(f"{API}/channels/{TEXT_ID}/messages/55", json={"id": "55"})
+    await call(hass, "edit_message", listening_bot.text, message_id="55", buttons=BUTTONS)
+    await call(hass, "edit_message", listening_bot.text, message_id="55", buttons=[])
+    first, second = sent(discord, "PATCH", "/messages/55")
+    assert first[2]["components"][0]["components"][0]["custom_id"] == "erledigt"
+    assert second[2] == {"components": []}

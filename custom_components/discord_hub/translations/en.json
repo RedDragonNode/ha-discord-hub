@@ -106,6 +106,65 @@
         "already_configured": "Direct messages to this user are already set up.",
         "invalid_auth": "Discord rejects the token of the bot. Please renew it first."
       }
+    },
+    "command": {
+      "initiate_flow": {
+        "user": "Add command",
+        "reconfigure": "Edit command"
+      },
+      "entry_type": "Command",
+      "step": {
+        "user": {
+          "title": "Choose a server",
+          "description": "The bot is a member of several servers. Choose the one for the command.",
+          "data": {
+            "guild_id": "Server"
+          }
+        },
+        "command": {
+          "title": "Add a command",
+          "description": "Server: {guild}. The command appears as /name in Discord and fires an event in Home Assistant. Options: one per line as name:type:description, with a ? after the name for optional ones and a choice in square brackets, for example mode:text:Operating mode [auto|on|off]. Types: text, integer, number, switch, user, channel. Who may use it: list user or role IDs or allow everyone. A reply is sent at once. Without one the bot shows “thinking” until your automation answers with discord_hub.respond (after 10 seconds it says “Done”).",
+          "data": {
+            "name": "Name (without the slash)",
+            "description": "Description",
+            "options": "Options (one per line)",
+            "reply": "Immediate reply (optional)",
+            "ephemeral": "Reply visible only to the user",
+            "everyone": "Everyone on the server may use it",
+            "users": "Allowed users (IDs)",
+            "roles": "Allowed roles (IDs)"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit command",
+          "description": "Changes reach Discord at once. Options: one per line as name:type:description, with a ? after the name for optional ones.",
+          "data": {
+            "name": "Name (without the slash)",
+            "description": "Description",
+            "options": "Options (one per line)",
+            "reply": "Immediate reply (optional)",
+            "ephemeral": "Reply visible only to the user",
+            "everyone": "Everyone on the server may use it",
+            "users": "Allowed users (IDs)",
+            "roles": "Allowed roles (IDs)"
+          }
+        }
+      },
+      "error": {
+        "invalid_name": "The name may only have lowercase letters, digits, - and _ (up to 32 characters).",
+        "invalid_description": "The description needs 1 to 100 characters.",
+        "invalid_options": "An option is not valid. Use name:type:description per line, with the types text, integer, number, switch, user or channel.",
+        "too_many_options": "A command can have at most 5 options.",
+        "invalid_ids": "User and role IDs consist of digits only.",
+        "already_exists": "This command already exists on this server.",
+        "no_permission": "Say who may use the command: add users or roles, allow everyone, or set allowed users in the options of the bot."
+      },
+      "abort": {
+        "invalid_auth": "Discord rejects the token of the bot. Please renew it first.",
+        "cannot_connect": "Discord cannot be reached. Please try again in a moment.",
+        "no_guilds": "The bot is not on any server yet. Invite it with the OAuth2 link from the Developer Portal first.",
+        "reconfigure_successful": "Saved."
+      }
     }
   },
   "services": {
@@ -144,6 +203,10 @@
         "avatar_url": {
           "name": "Avatar address",
           "description": "Webhooks only: the picture shown for this message."
+        },
+        "buttons": {
+          "name": "Buttons",
+          "description": "Buttons under the message: a list with label, custom_id, style (primary, secondary, success, danger or link), url (for link), emoji and disabled. A click fires the event discord_hub_button. An empty list removes the buttons. Needs a bot that listens to Discord."
         }
       }
     },
@@ -212,6 +275,10 @@
         "thread_id": {
           "name": "Thread",
           "description": "ID of the thread if the message is in one."
+        },
+        "buttons": {
+          "name": "Buttons",
+          "description": "Buttons under the message: a list with label, custom_id, style (primary, secondary, success, danger or link), url (for link), emoji and disabled. A click fires the event discord_hub_button. An empty list removes the buttons. Needs a bot that listens to Discord."
         }
       }
     },
@@ -300,6 +367,36 @@
     "list_forum_tags": {
       "name": "List forum tags",
       "description": "Returns the tags of a forum channel with their IDs (bots only)."
+    },
+    "respond": {
+      "name": "Respond",
+      "description": "Answers a command or a button click. The first answer to a command fills the “thinking” message, further answers are new messages. Returns the message ID.",
+      "fields": {
+        "interaction_id": {
+          "name": "Interaction",
+          "description": "The interaction_id from the event of the command or button."
+        },
+        "message": {
+          "name": "Message",
+          "description": "The text of the answer."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "A list of embeds, as for “Send message”."
+        },
+        "buttons": {
+          "name": "Buttons",
+          "description": "Buttons under the message: a list with label, custom_id, style (primary, secondary, success, danger or link), url (for link), emoji and disabled. A click fires the event discord_hub_button. An empty list removes the buttons. Needs a bot that listens to Discord."
+        },
+        "ephemeral": {
+          "name": "Only visible to the user",
+          "description": "For further answers: only the user who used the command sees the message. The first answer to a command follows the setting of the command."
+        },
+        "update": {
+          "name": "Change the message",
+          "description": "For a button click: change the message with the button instead of sending a new answer."
+        }
+      }
     }
   },
   "exceptions": {
@@ -380,6 +477,52 @@
     },
     "invalid_webhook": {
       "message": "The saved webhook address is not valid. Please enter it again."
+    },
+    "invalid_button": {
+      "message": "A button is not valid: {details}"
+    },
+    "too_many_buttons": {
+      "message": "A message can have at most {limit} buttons."
+    },
+    "buttons_need_listening": {
+      "message": "Buttons only work if the bot listens to Discord. Turn on “Listen to Discord” in the options of the bot."
+    },
+    "unknown_interaction": {
+      "message": "This interaction is unknown or too old. Discord allows answers for 15 minutes."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Listening to Discord",
+        "description": "Turn this on if the bot should receive commands, button clicks and reactions from Discord. Commands you add always turn it on. Receiving messages needs the “Message Content Intent” on the Bot page in the Developer Portal. The allowed users and roles (IDs) limit who can press buttons and react, an empty list allows everyone. Commands without a list of their own use these.",
+        "data": {
+          "listen": "Listen to Discord",
+          "receive_messages": "Receive messages (needs the Message Content Intent)",
+          "allowed_users": "Allowed users (IDs)",
+          "allowed_roles": "Allowed roles (IDs)"
+        }
+      }
+    },
+    "error": {
+      "invalid_ids": "User and role IDs consist of digits only."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Connected"
+      }
+    }
+  },
+  "issues": {
+    "intents_missing": {
+      "title": "Discord refuses the intents of a bot",
+      "description": "Discord closed the connection of {bot} because an intent is not enabled. Turn on the “Message Content Intent” on the Bot page in the Developer Portal, or turn off receiving messages in the options of the bot."
+    },
+    "commands_not_allowed": {
+      "title": "Discord refuses the commands of a bot",
+      "description": "Discord refused to create the commands of {bot}. Invite the bot again with the scope “applications.commands” (OAuth2 URL Generator in the Developer Portal)."
     }
   }
 }

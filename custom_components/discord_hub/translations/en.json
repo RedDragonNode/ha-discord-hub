@@ -1,0 +1,385 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Discord Hub",
+        "description": "Choose how Home Assistant talks to Discord. A bot can do everything (channels, forum posts, managing messages), a webhook can only send into one channel.",
+        "menu_options": {
+          "bot": "Bot (token)",
+          "webhook": "Webhook (address)"
+        }
+      },
+      "bot": {
+        "title": "Add a bot",
+        "description": "Create an application with a bot in the Discord Developer Portal, copy the bot token from the “Bot” page and invite the bot to your server. The token is stored only in Home Assistant.",
+        "data": {
+          "api_token": "Bot token"
+        }
+      },
+      "webhook": {
+        "title": "Add a webhook",
+        "description": "In Discord open the channel settings, then “Integrations”, “Webhooks” and copy the webhook address. The address contains a secret and is stored only in Home Assistant.",
+        "data": {
+          "name": "Name",
+          "webhook_url": "Webhook address"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Renew access",
+        "description": "Discord rejects the saved access. Please enter the current bot token or webhook address.",
+        "data": {
+          "api_token": "Bot token",
+          "webhook_url": "Webhook address"
+        }
+      },
+      "reconfigure": {
+        "title": "Change access",
+        "description": "Enter the new bot token or webhook address. It must belong to the same bot or webhook.",
+        "data": {
+          "api_token": "Bot token",
+          "webhook_url": "Webhook address"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Discord rejects this token. Please copy the bot token again from the Developer Portal.",
+      "cannot_connect": "Discord cannot be reached. Please try again in a moment.",
+      "invalid_webhook": "This is not a working webhook address. It looks like https://discord.com/api/webhooks/…"
+    },
+    "abort": {
+      "already_configured": "This bot or webhook is already set up.",
+      "reauth_successful": "The new access is saved.",
+      "reconfigure_successful": "Saved.",
+      "wrong_account": "This access belongs to a different bot or webhook than the one set up."
+    }
+  },
+  "config_subentries": {
+    "channel": {
+      "initiate_flow": {
+        "user": "Add channel"
+      },
+      "entry_type": "Channel",
+      "step": {
+        "user": {
+          "title": "Choose a server",
+          "description": "The bot is a member of several servers. Choose the one with the channel.",
+          "data": {
+            "guild_id": "Server"
+          }
+        },
+        "channel": {
+          "title": "Add a channel",
+          "description": "Server: {guild}. Text, announcement, voice, forum and media channels are offered. The channel gets a notify entity for sending.",
+          "data": {
+            "channel_id": "Channel"
+          }
+        }
+      },
+      "abort": {
+        "invalid_auth": "Discord rejects the token of the bot. Please renew it first.",
+        "cannot_connect": "Discord cannot be reached. Please try again in a moment.",
+        "no_guilds": "The bot is not on any server yet. Invite it with the OAuth2 link from the Developer Portal first.",
+        "forbidden": "The bot may not list the channels of this server.",
+        "no_channels": "There is no further channel to add on this server."
+      }
+    },
+    "user": {
+      "initiate_flow": {
+        "user": "Add direct messages"
+      },
+      "entry_type": "Direct messages",
+      "step": {
+        "user": {
+          "title": "Direct messages to a user",
+          "description": "The bot can only write to users who share a server with it. Copy the user ID in Discord (developer mode, right click on the user, “Copy user ID”).",
+          "data": {
+            "name": "Name",
+            "user_id": "User ID"
+          }
+        }
+      },
+      "error": {
+        "invalid_user": "This is not a valid user ID.",
+        "cannot_connect": "Discord cannot be reached. Please try again in a moment."
+      },
+      "abort": {
+        "already_configured": "Direct messages to this user are already set up.",
+        "invalid_auth": "Discord rejects the token of the bot. Please renew it first."
+      }
+    }
+  },
+  "services": {
+    "send_message": {
+      "name": "Send message",
+      "description": "Sends a message with text, embeds and files into the channel, the thread or the direct messages. Returns the message ID.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "The text of the message (up to 2000 characters). User, role and channel mentions like <@123> work."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "A list of embeds with title, description, color (#RRGGBB), url, author, footer, thumbnail, image, fields and timestamp."
+        },
+        "files": {
+          "name": "Files",
+          "description": "Images and videos to attach: a list of local paths, web addresses, camera entities (a snapshot) or media sources. An entry can also be an object with path, url, camera or media, plus filename and spoiler."
+        },
+        "reply_to": {
+          "name": "Reply to",
+          "description": "ID of a message in the same channel that this message answers."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of a thread in this channel. The message then goes into the thread."
+        },
+        "allow_everyone": {
+          "name": "Allow @everyone",
+          "description": "Lets @everyone and @here in the text ping everybody. Users and roles can always be mentioned."
+        },
+        "username": {
+          "name": "Name shown",
+          "description": "Webhooks only: the name shown for this message."
+        },
+        "avatar_url": {
+          "name": "Avatar address",
+          "description": "Webhooks only: the picture shown for this message."
+        }
+      }
+    },
+    "forum_post": {
+      "name": "Forum post",
+      "description": "Creates a new thread in a forum channel. With “One thread per day” only the first call of the day creates a thread, later calls with the same key write into it. Returns the thread ID, the message ID and whether the thread is new.",
+      "fields": {
+        "thread_name": {
+          "name": "Thread name",
+          "description": "Title of the new thread (up to 100 characters)."
+        },
+        "message": {
+          "name": "Message",
+          "description": "The text of the first message."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "A list of embeds, as for “Send message”."
+        },
+        "files": {
+          "name": "Files",
+          "description": "Images and videos to attach, as for “Send message”."
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Forum tags by name or ID. A webhook needs the IDs (see “List forum tags”)."
+        },
+        "daily": {
+          "name": "One thread per day",
+          "description": "Reuses today's thread of the same key instead of creating a new one. If the thread was deleted, a new one is created."
+        },
+        "key": {
+          "name": "Key",
+          "description": "Tells the daily threads of one forum apart, for example per sensor or per camera."
+        },
+        "allow_everyone": {
+          "name": "Allow @everyone",
+          "description": "Lets @everyone and @here in the text ping everybody."
+        },
+        "username": {
+          "name": "Name shown",
+          "description": "Webhooks only: the name shown for this post."
+        },
+        "avatar_url": {
+          "name": "Avatar address",
+          "description": "Webhooks only: the picture shown for this post."
+        }
+      }
+    },
+    "edit_message": {
+      "name": "Edit message",
+      "description": "Changes the text or the embeds of a message sent by this bot or webhook.",
+      "fields": {
+        "message_id": {
+          "name": "Message ID",
+          "description": "ID of the message to change."
+        },
+        "message": {
+          "name": "Message",
+          "description": "The new text. An empty text removes it."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "The new embeds. An empty list removes them."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of the thread if the message is in one."
+        }
+      }
+    },
+    "delete_message": {
+      "name": "Delete message",
+      "description": "Deletes a message.",
+      "fields": {
+        "message_id": {
+          "name": "Message ID",
+          "description": "ID of the message to delete."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of the thread if the message is in one."
+        }
+      }
+    },
+    "add_reaction": {
+      "name": "Add reaction",
+      "description": "Adds an emoji reaction to a message (bots only).",
+      "fields": {
+        "message_id": {
+          "name": "Message ID",
+          "description": "ID of the message."
+        },
+        "emoji": {
+          "name": "Emoji",
+          "description": "The emoji, for example ✅."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of the thread if the message is in one."
+        }
+      }
+    },
+    "pin_message": {
+      "name": "Pin message",
+      "description": "Pins a message in its channel (bots only).",
+      "fields": {
+        "message_id": {
+          "name": "Message ID",
+          "description": "ID of the message."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of the thread if the message is in one."
+        }
+      }
+    },
+    "unpin_message": {
+      "name": "Unpin message",
+      "description": "Removes the pin from a message (bots only).",
+      "fields": {
+        "message_id": {
+          "name": "Message ID",
+          "description": "ID of the message."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of the thread if the message is in one."
+        }
+      }
+    },
+    "update_thread": {
+      "name": "Update thread",
+      "description": "Archives, locks, unlocks or renames a thread (bots only). Returns the new state.",
+      "fields": {
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID of the thread."
+        },
+        "archived": {
+          "name": "Archived",
+          "description": "Archive or reopen the thread."
+        },
+        "locked": {
+          "name": "Locked",
+          "description": "Lock or unlock the thread."
+        },
+        "name": {
+          "name": "Name",
+          "description": "The new name of the thread."
+        }
+      }
+    },
+    "list_forum_tags": {
+      "name": "List forum tags",
+      "description": "Returns the tags of a forum channel with their IDs (bots only)."
+    }
+  },
+  "exceptions": {
+    "invalid_embed": {
+      "message": "An embed is not valid: {details}"
+    },
+    "message_too_long": {
+      "message": "The message has {length} characters, Discord allows {limit}."
+    },
+    "too_many_embeds": {
+      "message": "A message can have at most {limit} embeds."
+    },
+    "file_source": {
+      "message": "A file needs exactly one of path, url, camera or media: {spec}"
+    },
+    "file_too_big": {
+      "message": "The file {name} is larger than {limit} MB."
+    },
+    "path_not_allowed": {
+      "message": "The path {path} is not allowed. Add its folder to allowlist_external_dirs in the configuration."
+    },
+    "file_not_found": {
+      "message": "The file {path} does not exist."
+    },
+    "file_unreadable": {
+      "message": "The file {path} cannot be read."
+    },
+    "url_not_allowed": {
+      "message": "The address {url} is not allowed. Add it to allowlist_external_urls in the configuration."
+    },
+    "download_failed": {
+      "message": "The file at {url} could not be downloaded: {details}"
+    },
+    "media_not_local": {
+      "message": "The media source {uri} is not a local file and cannot be attached."
+    },
+    "too_many_files": {
+      "message": "A message can have at most {limit} files."
+    },
+    "bot_only": {
+      "message": "This action needs a bot, a webhook cannot do it."
+    },
+    "webhook_tag_ids": {
+      "message": "A webhook can only use tag IDs. Get them with “List forum tags” on a bot."
+    },
+    "unknown_tag": {
+      "message": "The forum has no tag “{name}”. Available: {known}"
+    },
+    "not_a_forum": {
+      "message": "This action needs a forum channel."
+    },
+    "empty_message": {
+      "message": "The message is empty. Give a text, embeds or files."
+    },
+    "nothing_to_change": {
+      "message": "Nothing to change: no new values were given."
+    },
+    "auth_failed": {
+      "message": "Discord rejects the access ({details}). Please renew the token or the webhook address."
+    },
+    "forbidden": {
+      "message": "Discord refuses this: {details}. The bot probably lacks a permission in this channel."
+    },
+    "not_found": {
+      "message": "Discord does not find it: {details}. Channel, thread, message or webhook may have been deleted."
+    },
+    "file_rejected": {
+      "message": "Discord rejects the files as too large for this server ({details})."
+    },
+    "rate_limited": {
+      "message": "Discord is limiting requests for too long ({details}). Please try again later."
+    },
+    "cannot_connect": {
+      "message": "Discord cannot be reached: {details}"
+    },
+    "api_error": {
+      "message": "Discord reports an error: {details}"
+    },
+    "invalid_webhook": {
+      "message": "The saved webhook address is not valid. Please enter it again."
+    }
+  }
+}

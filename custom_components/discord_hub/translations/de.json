@@ -1,0 +1,385 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Discord Hub hinzufügen",
+        "description": "Wähle, wie Home Assistant mit Discord spricht. Ein Bot kann alles (Kanäle, Forum-Posts, Nachrichten verwalten), ein Webhook kann nur in einen Kanal senden.",
+        "menu_options": {
+          "bot": "Bot (Token)",
+          "webhook": "Webhook (Adresse)"
+        }
+      },
+      "bot": {
+        "title": "Bot hinzufügen",
+        "description": "Lege im Discord Developer Portal eine Anwendung mit einem Bot an, kopiere auf der Seite „Bot“ den Token und lade den Bot auf deinen Server ein. Der Token wird nur in Home Assistant gespeichert.",
+        "data": {
+          "api_token": "Bot-Token"
+        }
+      },
+      "webhook": {
+        "title": "Webhook hinzufügen",
+        "description": "Öffne in Discord die Kanaleinstellungen, dann „Integrationen“ und „Webhooks“ und kopiere die Webhook-Adresse. Die Adresse enthält ein Geheimnis und wird nur in Home Assistant gespeichert.",
+        "data": {
+          "name": "Name",
+          "webhook_url": "Webhook-Adresse"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Zugang erneuern",
+        "description": "Discord lehnt den gespeicherten Zugang ab. Bitte gib den aktuellen Bot-Token oder die aktuelle Webhook-Adresse ein.",
+        "data": {
+          "api_token": "Bot-Token",
+          "webhook_url": "Webhook-Adresse"
+        }
+      },
+      "reconfigure": {
+        "title": "Zugang ändern",
+        "description": "Gib den neuen Bot-Token oder die neue Webhook-Adresse ein. Sie müssen zum selben Bot beziehungsweise Webhook gehören.",
+        "data": {
+          "api_token": "Bot-Token",
+          "webhook_url": "Webhook-Adresse"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Discord lehnt diesen Token ab. Bitte kopiere den Bot-Token noch einmal aus dem Developer Portal.",
+      "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal.",
+      "invalid_webhook": "Das ist keine funktionierende Webhook-Adresse. Sie sieht aus wie https://discord.com/api/webhooks/…"
+    },
+    "abort": {
+      "already_configured": "Dieser Bot oder Webhook ist schon eingerichtet.",
+      "reauth_successful": "Der neue Zugang ist gespeichert.",
+      "reconfigure_successful": "Gespeichert.",
+      "wrong_account": "Dieser Zugang gehört zu einem anderen Bot oder Webhook als dem eingerichteten."
+    }
+  },
+  "config_subentries": {
+    "channel": {
+      "initiate_flow": {
+        "user": "Kanal hinzufügen"
+      },
+      "entry_type": "Kanal",
+      "step": {
+        "user": {
+          "title": "Server wählen",
+          "description": "Der Bot ist auf mehreren Servern. Wähle den mit dem Kanal.",
+          "data": {
+            "guild_id": "Server"
+          }
+        },
+        "channel": {
+          "title": "Kanal hinzufügen",
+          "description": "Server: {guild}. Zur Wahl stehen Text-, Ankündigungs-, Sprach-, Forum- und Media-Kanäle. Der Kanal bekommt eine notify-Entity zum Senden.",
+          "data": {
+            "channel_id": "Kanal"
+          }
+        }
+      },
+      "abort": {
+        "invalid_auth": "Discord lehnt den Token des Bots ab. Bitte erneuere ihn zuerst.",
+        "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal.",
+        "no_guilds": "Der Bot ist noch auf keinem Server. Lade ihn zuerst mit dem OAuth2-Link aus dem Developer Portal ein.",
+        "forbidden": "Der Bot darf die Kanäle dieses Servers nicht auflisten.",
+        "no_channels": "Auf diesem Server gibt es keinen weiteren Kanal zum Hinzufügen."
+      }
+    },
+    "user": {
+      "initiate_flow": {
+        "user": "Direktnachrichten hinzufügen"
+      },
+      "entry_type": "Direktnachrichten",
+      "step": {
+        "user": {
+          "title": "Direktnachrichten an einen Nutzer",
+          "description": "Der Bot kann nur Nutzern schreiben, die mit ihm einen Server teilen. Kopiere die Nutzer-ID in Discord (Entwicklermodus, Rechtsklick auf den Nutzer, „Nutzer-ID kopieren“).",
+          "data": {
+            "name": "Name",
+            "user_id": "Nutzer-ID"
+          }
+        }
+      },
+      "error": {
+        "invalid_user": "Das ist keine gültige Nutzer-ID.",
+        "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal."
+      },
+      "abort": {
+        "already_configured": "Direktnachrichten an diesen Nutzer sind schon eingerichtet.",
+        "invalid_auth": "Discord lehnt den Token des Bots ab. Bitte erneuere ihn zuerst."
+      }
+    }
+  },
+  "services": {
+    "send_message": {
+      "name": "Nachricht senden",
+      "description": "Schickt eine Nachricht mit Text, Embeds und Dateien in den Kanal, den Thread oder die Direktnachrichten. Gibt die Nachrichten-ID zurück.",
+      "fields": {
+        "message": {
+          "name": "Nachricht",
+          "description": "Der Text der Nachricht (bis 2000 Zeichen). Erwähnungen von Nutzern, Rollen und Kanälen wie <@123> funktionieren."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "Eine Liste von Embeds mit title, description, color (#RRGGBB), url, author, footer, thumbnail, image, fields und timestamp."
+        },
+        "files": {
+          "name": "Dateien",
+          "description": "Bilder und Videos zum Anhängen: eine Liste von lokalen Pfaden, Web-Adressen, Kamera-Entities (ein Schnappschuss) oder Medienquellen. Ein Eintrag kann auch ein Objekt mit path, url, camera oder media sein, dazu filename und spoiler."
+        },
+        "reply_to": {
+          "name": "Antwort auf",
+          "description": "ID einer Nachricht im selben Kanal, auf die diese Nachricht antwortet."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID eines Threads in diesem Kanal. Die Nachricht geht dann in den Thread."
+        },
+        "allow_everyone": {
+          "name": "@everyone erlauben",
+          "description": "Lässt @everyone und @here im Text alle benachrichtigen. Nutzer und Rollen lassen sich immer erwähnen."
+        },
+        "username": {
+          "name": "Angezeigter Name",
+          "description": "Nur Webhooks: der Name, der bei dieser Nachricht angezeigt wird."
+        },
+        "avatar_url": {
+          "name": "Adresse des Avatars",
+          "description": "Nur Webhooks: das Bild, das bei dieser Nachricht angezeigt wird."
+        }
+      }
+    },
+    "forum_post": {
+      "name": "Forum-Post",
+      "description": "Legt einen neuen Thread in einem Forum-Kanal an. Mit „Ein Thread pro Tag“ legt nur der erste Aufruf des Tages einen Thread an, weitere Aufrufe mit demselben Schlüssel schreiben hinein. Gibt die Thread-ID und die Nachrichten-ID zurück und ob der Thread neu ist.",
+      "fields": {
+        "thread_name": {
+          "name": "Name des Threads",
+          "description": "Titel des neuen Threads (bis 100 Zeichen)."
+        },
+        "message": {
+          "name": "Nachricht",
+          "description": "Der Text der ersten Nachricht."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "Eine Liste von Embeds, wie bei „Nachricht senden“."
+        },
+        "files": {
+          "name": "Dateien",
+          "description": "Bilder und Videos zum Anhängen, wie bei „Nachricht senden“."
+        },
+        "tags": {
+          "name": "Tags",
+          "description": "Forum-Tags mit Name oder ID. Ein Webhook braucht die IDs (siehe „Forum-Tags auflisten“)."
+        },
+        "daily": {
+          "name": "Ein Thread pro Tag",
+          "description": "Nutzt den heutigen Thread desselben Schlüssels weiter, statt einen neuen anzulegen. Wurde der Thread gelöscht, entsteht ein neuer."
+        },
+        "key": {
+          "name": "Schlüssel",
+          "description": "Unterscheidet die Tages-Threads eines Forums, zum Beispiel je Sensor oder je Kamera."
+        },
+        "allow_everyone": {
+          "name": "@everyone erlauben",
+          "description": "Lässt @everyone und @here im Text alle benachrichtigen."
+        },
+        "username": {
+          "name": "Angezeigter Name",
+          "description": "Nur Webhooks: der Name, der bei diesem Post angezeigt wird."
+        },
+        "avatar_url": {
+          "name": "Adresse des Avatars",
+          "description": "Nur Webhooks: das Bild, das bei diesem Post angezeigt wird."
+        }
+      }
+    },
+    "edit_message": {
+      "name": "Nachricht bearbeiten",
+      "description": "Ändert Text oder Embeds einer Nachricht, die dieser Bot oder Webhook gesendet hat.",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "ID der Nachricht, die geändert wird."
+        },
+        "message": {
+          "name": "Nachricht",
+          "description": "Der neue Text. Ein leerer Text entfernt ihn."
+        },
+        "embeds": {
+          "name": "Embeds",
+          "description": "Die neuen Embeds. Eine leere Liste entfernt sie."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID des Threads, wenn die Nachricht in einem liegt."
+        }
+      }
+    },
+    "delete_message": {
+      "name": "Nachricht löschen",
+      "description": "Löscht eine Nachricht.",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "ID der Nachricht, die gelöscht wird."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID des Threads, wenn die Nachricht in einem liegt."
+        }
+      }
+    },
+    "add_reaction": {
+      "name": "Reaktion hinzufügen",
+      "description": "Hängt eine Emoji-Reaktion an eine Nachricht (nur Bots).",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "ID der Nachricht."
+        },
+        "emoji": {
+          "name": "Emoji",
+          "description": "Das Emoji, zum Beispiel ✅."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID des Threads, wenn die Nachricht in einem liegt."
+        }
+      }
+    },
+    "pin_message": {
+      "name": "Nachricht anheften",
+      "description": "Heftet eine Nachricht in ihrem Kanal an (nur Bots).",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "ID der Nachricht."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID des Threads, wenn die Nachricht in einem liegt."
+        }
+      }
+    },
+    "unpin_message": {
+      "name": "Nachricht lösen",
+      "description": "Nimmt die Anheftung von einer Nachricht (nur Bots).",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "ID der Nachricht."
+        },
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID des Threads, wenn die Nachricht in einem liegt."
+        }
+      }
+    },
+    "update_thread": {
+      "name": "Thread ändern",
+      "description": "Archiviert, sperrt, entsperrt oder benennt einen Thread um (nur Bots). Gibt den neuen Zustand zurück.",
+      "fields": {
+        "thread_id": {
+          "name": "Thread",
+          "description": "ID des Threads."
+        },
+        "archived": {
+          "name": "Archiviert",
+          "description": "Den Thread archivieren oder wieder öffnen."
+        },
+        "locked": {
+          "name": "Gesperrt",
+          "description": "Den Thread sperren oder entsperren."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Der neue Name des Threads."
+        }
+      }
+    },
+    "list_forum_tags": {
+      "name": "Forum-Tags auflisten",
+      "description": "Gibt die Tags eines Forum-Kanals mit ihren IDs zurück (nur Bots)."
+    }
+  },
+  "exceptions": {
+    "invalid_embed": {
+      "message": "Ein Embed ist ungültig: {details}"
+    },
+    "message_too_long": {
+      "message": "Die Nachricht hat {length} Zeichen, Discord erlaubt {limit}."
+    },
+    "too_many_embeds": {
+      "message": "Eine Nachricht kann höchstens {limit} Embeds haben."
+    },
+    "file_source": {
+      "message": "Eine Datei braucht genau eines von path, url, camera oder media: {spec}"
+    },
+    "file_too_big": {
+      "message": "Die Datei {name} ist größer als {limit} MB."
+    },
+    "path_not_allowed": {
+      "message": "Der Pfad {path} ist nicht erlaubt. Trage seinen Ordner in der Konfiguration unter allowlist_external_dirs ein."
+    },
+    "file_not_found": {
+      "message": "Die Datei {path} gibt es nicht."
+    },
+    "file_unreadable": {
+      "message": "Die Datei {path} lässt sich nicht lesen."
+    },
+    "url_not_allowed": {
+      "message": "Die Adresse {url} ist nicht erlaubt. Trage sie in der Konfiguration unter allowlist_external_urls ein."
+    },
+    "download_failed": {
+      "message": "Die Datei von {url} ließ sich nicht herunterladen: {details}"
+    },
+    "media_not_local": {
+      "message": "Die Medienquelle {uri} ist keine lokale Datei und lässt sich nicht anhängen."
+    },
+    "too_many_files": {
+      "message": "Eine Nachricht kann höchstens {limit} Dateien haben."
+    },
+    "bot_only": {
+      "message": "Das geht nur mit einem Bot, ein Webhook kann es nicht."
+    },
+    "webhook_tag_ids": {
+      "message": "Ein Webhook kann nur Tag-IDs verwenden. Hole sie mit „Forum-Tags auflisten“ an einem Bot."
+    },
+    "unknown_tag": {
+      "message": "Das Forum hat keinen Tag „{name}“. Vorhanden: {known}"
+    },
+    "not_a_forum": {
+      "message": "Das geht nur mit einem Forum-Kanal."
+    },
+    "empty_message": {
+      "message": "Die Nachricht ist leer. Gib einen Text, Embeds oder Dateien an."
+    },
+    "nothing_to_change": {
+      "message": "Es gibt nichts zu ändern: Es wurden keine neuen Werte angegeben."
+    },
+    "auth_failed": {
+      "message": "Discord lehnt den Zugang ab ({details}). Bitte erneuere den Token oder die Webhook-Adresse."
+    },
+    "forbidden": {
+      "message": "Discord verweigert das: {details}. Dem Bot fehlt wahrscheinlich eine Berechtigung in diesem Kanal."
+    },
+    "not_found": {
+      "message": "Discord findet es nicht: {details}. Kanal, Thread, Nachricht oder Webhook sind vielleicht gelöscht."
+    },
+    "file_rejected": {
+      "message": "Discord lehnt die Dateien als zu groß für diesen Server ab ({details})."
+    },
+    "rate_limited": {
+      "message": "Discord bremst die Anfragen schon zu lange ({details}). Bitte versuche es später noch einmal."
+    },
+    "cannot_connect": {
+      "message": "Discord ist nicht erreichbar: {details}"
+    },
+    "api_error": {
+      "message": "Discord meldet einen Fehler: {details}"
+    },
+    "invalid_webhook": {
+      "message": "Die gespeicherte Webhook-Adresse ist nicht gültig. Bitte gib sie noch einmal ein."
+    }
+  }
+}

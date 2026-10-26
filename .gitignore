@@ -1,0 +1,19 @@
+# Zugangsdaten und Rohdaten von echten Kameras gehören nie ins Repo
+.env.local
+tools/out/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,9 @@
+pytest-homeassistant-custom-component
+ruff
+
+# Anforderungen der Home-Assistant-Komponenten, die die Tests laden (camera, network)
+aiodhcpwatcher
+aiodiscover
+cached-ipaddress
+ifaddr
+PyTurboJPEG

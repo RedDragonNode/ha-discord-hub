@@ -1,0 +1,203 @@
+send_message:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    message:
+      example: "Bewegung im Fuchsbau"
+      selector:
+        text:
+          multiline: true
+    embeds:
+      example: '[{"title": "Bewegung", "description": "Um 14:03", "color": "#2ECC71"}]'
+      selector:
+        object:
+    files:
+      example: '["camera.fuchsrevier", "/media/Aufnahmen/video.mp4"]'
+      selector:
+        object:
+    reply_to:
+      advanced: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    thread_id:
+      advanced: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    allow_everyone:
+      advanced: true
+      default: false
+      selector:
+        boolean:
+    username:
+      advanced: true
+      example: "Fuchsbau"
+      selector:
+        text:
+    avatar_url:
+      advanced: true
+      selector:
+        text:
+forum_post:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    thread_name:
+      required: true
+      example: "Bewegung Fuchs - 26.10.2026"
+      selector:
+        text:
+    message:
+      example: "Bewegung erkannt"
+      selector:
+        text:
+          multiline: true
+    embeds:
+      selector:
+        object:
+    files:
+      selector:
+        object:
+    tags:
+      example: '["Fuchs"]'
+      selector:
+        object:
+    daily:
+      default: false
+      selector:
+        boolean:
+    key:
+      default: default
+      example: fuchs_belegung
+      selector:
+        text:
+    allow_everyone:
+      advanced: true
+      default: false
+      selector:
+        boolean:
+    username:
+      advanced: true
+      selector:
+        text:
+    avatar_url:
+      advanced: true
+      selector:
+        text:
+edit_message:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    message_id:
+      required: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    message:
+      selector:
+        text:
+          multiline: true
+    embeds:
+      selector:
+        object:
+    thread_id:
+      advanced: true
+      selector:
+        text:
+delete_message:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    message_id:
+      required: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    thread_id:
+      advanced: true
+      selector:
+        text:
+add_reaction:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    message_id:
+      required: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    emoji:
+      required: true
+      example: "✅"
+      selector:
+        text:
+    thread_id:
+      advanced: true
+      selector:
+        text:
+pin_message:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    message_id:
+      required: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    thread_id:
+      advanced: true
+      selector:
+        text:
+unpin_message:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    message_id:
+      required: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    thread_id:
+      advanced: true
+      selector:
+        text:
+update_thread:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify
+  fields:
+    thread_id:
+      required: true
+      example: "1234567890123456789"
+      selector:
+        text:
+    archived:
+      selector:
+        boolean:
+    locked:
+      selector:
+        boolean:
+    name:
+      selector:
+        text:
+list_forum_tags:
+  target:
+    entity:
+      integration: discord_hub
+      domain: notify

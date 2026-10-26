@@ -1,0 +1,13 @@
+{
+  "domain": "discord_hub",
+  "name": "Discord Hub",
+  "codeowners": ["@RedDragonNode"],
+  "config_flow": true,
+  "dependencies": ["camera", "media_source"],
+  "documentation": "https://github.com/RedDragonNode/ha-discord-hub",
+  "integration_type": "service",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/RedDragonNode/ha-discord-hub/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

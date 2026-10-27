@@ -165,6 +165,60 @@
         "no_guilds": "Der Bot ist noch auf keinem Server. Lade ihn zuerst mit dem OAuth2-Link aus dem Developer Portal ein.",
         "reconfigure_successful": "Gespeichert."
       }
+    },
+    "server": {
+      "initiate_flow": {
+        "user": "Server beobachten"
+      },
+      "entry_type": "Server",
+      "step": {
+        "user": {
+          "title": "Server wählen",
+          "description": "Der Bot ist auf mehreren Servern. Wähle den, den du beobachten willst.",
+          "data": {
+            "guild_id": "Server"
+          }
+        }
+      },
+      "abort": {
+        "invalid_auth": "Discord lehnt den Token des Bots ab. Bitte erneuere ihn zuerst.",
+        "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal.",
+        "no_guilds": "Der Bot ist noch auf keinem Server. Lade ihn zuerst mit dem OAuth2-Link aus dem Developer Portal ein.",
+        "already_configured": "Dieser Server wird schon beobachtet."
+      }
+    },
+    "member": {
+      "initiate_flow": {
+        "user": "Mitglied beobachten"
+      },
+      "entry_type": "Mitglied",
+      "step": {
+        "user": {
+          "title": "Server wählen",
+          "description": "Der Bot ist auf mehreren Servern. Wähle den, auf dem das Mitglied ist.",
+          "data": {
+            "guild_id": "Server"
+          }
+        },
+        "member": {
+          "title": "Mitglied beobachten",
+          "description": "Server: {guild}. Kopiere die Nutzer-ID in Discord (Entwicklermodus, Rechtsklick auf den Nutzer, „Nutzer-ID kopieren“). Du siehst dann, ob das Mitglied in einem Sprachkanal ist. Status und Aktivität gibt es, wenn in den Optionen des Bots „Status der Mitglieder verfolgen“ an ist (das braucht den „Presence Intent“ im Developer Portal).",
+          "data": {
+            "user_id": "Nutzer-ID"
+          }
+        }
+      },
+      "error": {
+        "invalid_user": "Das ist keine gültige Nutzer-ID.",
+        "unknown_member": "Dieses Mitglied ist nicht auf dem Server.",
+        "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal."
+      },
+      "abort": {
+        "invalid_auth": "Discord lehnt den Token des Bots ab. Bitte erneuere ihn zuerst.",
+        "cannot_connect": "Discord ist nicht erreichbar. Bitte versuche es gleich noch einmal.",
+        "no_guilds": "Der Bot ist noch auf keinem Server. Lade ihn zuerst mit dem OAuth2-Link aus dem Developer Portal ein.",
+        "already_configured": "Dieses Mitglied wird schon beobachtet."
+      }
     }
   },
   "services": {
@@ -495,10 +549,11 @@
     "step": {
       "init": {
         "title": "Auf Discord hören",
-        "description": "Schalte das ein, wenn der Bot Befehle, Button-Klicks und Reaktionen aus Discord empfangen soll. Befehle, die du anlegst, schalten es immer ein. Nachrichten empfangen braucht den „Message Content Intent“ auf der Seite „Bot“ im Developer Portal. Die erlaubten Nutzer und Rollen (IDs) begrenzen, wer Buttons drücken und reagieren darf, eine leere Liste erlaubt jedem. Befehle ohne eigene Liste benutzen diese.",
+        "description": "Schalte das ein, wenn der Bot Befehle, Button-Klicks und Reaktionen aus Discord empfangen soll. Befehle, die du anlegst, und beobachtete Server schalten es immer ein. Nachrichten empfangen braucht den „Message Content Intent“ auf der Seite „Bot“ im Developer Portal. Status der Mitglieder verfolgen braucht den „Presence Intent“ ebenda und zeigt Status und Aktivität der Mitglieder, die du beobachtest. Die erlaubten Nutzer und Rollen (IDs) begrenzen, wer Buttons drücken und reagieren darf, eine leere Liste erlaubt jedem. Befehle ohne eigene Liste benutzen diese.",
         "data": {
           "listen": "Auf Discord hören",
           "receive_messages": "Nachrichten empfangen (braucht den Message Content Intent)",
+          "track_presence": "Status der Mitglieder verfolgen (braucht den Presence Intent)",
           "allowed_users": "Erlaubte Nutzer (IDs)",
           "allowed_roles": "Erlaubte Rollen (IDs)"
         }
@@ -512,13 +567,39 @@
     "binary_sensor": {
       "connected": {
         "name": "Verbunden"
+      },
+      "member_in_voice": {
+        "name": "Im Sprachkanal"
+      }
+    },
+    "sensor": {
+      "server_members": {
+        "name": "Mitglieder"
+      },
+      "server_online": {
+        "name": "Online"
+      },
+      "voice_users": {
+        "name": "In Sprachkanälen"
+      },
+      "member_status": {
+        "name": "Status",
+        "state": {
+          "online": "Online",
+          "idle": "Abwesend",
+          "dnd": "Bitte nicht stören",
+          "offline": "Offline"
+        }
+      },
+      "member_activity": {
+        "name": "Aktivität"
       }
     }
   },
   "issues": {
     "intents_missing": {
       "title": "Discord lehnt die Intents eines Bots ab",
-      "description": "Discord hat die Verbindung von {bot} beendet, weil ein Intent nicht freigeschaltet ist. Schalte auf der Seite „Bot“ im Developer Portal den „Message Content Intent“ ein oder schalte in den Optionen des Bots das Empfangen von Nachrichten aus."
+      "description": "Discord hat die Verbindung von {bot} beendet, weil ein Intent nicht freigeschaltet ist. Schalte auf der Seite „Bot“ im Developer Portal den „Message Content Intent“ (zum Empfangen von Nachrichten) und den „Presence Intent“ (für den Status der Mitglieder) ein oder schalte die Funktion in den Optionen des Bots aus."
     },
     "commands_not_allowed": {
       "title": "Discord lehnt die Befehle eines Bots ab",

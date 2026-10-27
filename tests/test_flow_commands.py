@@ -29,6 +29,7 @@ async def test_options_of_a_bot(hass, discord):
         {
             "listen": True,
             "receive_messages": False,
+            "track_presence": True,
             "allowed_users": ["555", " 555 ", "666", ""],
             "allowed_roles": ["7"],
         },
@@ -37,6 +38,7 @@ async def test_options_of_a_bot(hass, discord):
     assert entry.options == {
         "listen": True,
         "receive_messages": False,
+        "track_presence": True,
         "allowed_users": ["555", "666"],
         "allowed_roles": ["7"],
     }

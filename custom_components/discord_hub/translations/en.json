@@ -165,6 +165,60 @@
         "no_guilds": "The bot is not on any server yet. Invite it with the OAuth2 link from the Developer Portal first.",
         "reconfigure_successful": "Saved."
       }
+    },
+    "server": {
+      "initiate_flow": {
+        "user": "Watch a server"
+      },
+      "entry_type": "Server",
+      "step": {
+        "user": {
+          "title": "Choose a server",
+          "description": "The bot is on several servers. Choose the one you want to watch.",
+          "data": {
+            "guild_id": "Server"
+          }
+        }
+      },
+      "abort": {
+        "invalid_auth": "Discord rejects the bot's token. Please renew it first.",
+        "cannot_connect": "Discord cannot be reached. Please try again in a moment.",
+        "no_guilds": "The bot is not on any server yet. Invite it first with the OAuth2 link from the Developer Portal.",
+        "already_configured": "This server is already being watched."
+      }
+    },
+    "member": {
+      "initiate_flow": {
+        "user": "Watch a member"
+      },
+      "entry_type": "Member",
+      "step": {
+        "user": {
+          "title": "Choose a server",
+          "description": "The bot is on several servers. Choose the one the member is on.",
+          "data": {
+            "guild_id": "Server"
+          }
+        },
+        "member": {
+          "title": "Watch a member",
+          "description": "Server: {guild}. Copy the user ID in Discord (developer mode, right-click the user, \"Copy User ID\"). You will see whether the member is in a voice channel. Status and activity are available when \"Track member status\" is on in the bot's options (this needs the \"Presence Intent\" in the Developer Portal).",
+          "data": {
+            "user_id": "User ID"
+          }
+        }
+      },
+      "error": {
+        "invalid_user": "This is not a valid user ID.",
+        "unknown_member": "This member is not on the server.",
+        "cannot_connect": "Discord cannot be reached. Please try again in a moment."
+      },
+      "abort": {
+        "invalid_auth": "Discord rejects the bot's token. Please renew it first.",
+        "cannot_connect": "Discord cannot be reached. Please try again in a moment.",
+        "no_guilds": "The bot is not on any server yet. Invite it first with the OAuth2 link from the Developer Portal.",
+        "already_configured": "This member is already being watched."
+      }
     }
   },
   "services": {
@@ -495,10 +549,11 @@
     "step": {
       "init": {
         "title": "Listening to Discord",
-        "description": "Turn this on if the bot should receive commands, button clicks and reactions from Discord. Commands you add always turn it on. Receiving messages needs the “Message Content Intent” on the Bot page in the Developer Portal. The allowed users and roles (IDs) limit who can press buttons and react, an empty list allows everyone. Commands without a list of their own use these.",
+        "description": "Turn this on if the bot should receive commands, button clicks and reactions from Discord. Commands you create and watched servers always turn it on. Receiving messages needs the \"Message Content Intent\" on the \"Bot\" page in the Developer Portal. Tracking member status needs the \"Presence Intent\" there and shows status and activity of the members you watch. The allowed users and roles (IDs) limit who may press buttons and react, an empty list allows everyone. Commands without their own list use these.",
         "data": {
           "listen": "Listen to Discord",
           "receive_messages": "Receive messages (needs the Message Content Intent)",
+          "track_presence": "Track member status (needs the Presence Intent)",
           "allowed_users": "Allowed users (IDs)",
           "allowed_roles": "Allowed roles (IDs)"
         }
@@ -512,13 +567,39 @@
     "binary_sensor": {
       "connected": {
         "name": "Connected"
+      },
+      "member_in_voice": {
+        "name": "In voice channel"
+      }
+    },
+    "sensor": {
+      "server_members": {
+        "name": "Members"
+      },
+      "server_online": {
+        "name": "Online"
+      },
+      "voice_users": {
+        "name": "In voice channels"
+      },
+      "member_status": {
+        "name": "Status",
+        "state": {
+          "online": "Online",
+          "idle": "Idle",
+          "dnd": "Do not disturb",
+          "offline": "Offline"
+        }
+      },
+      "member_activity": {
+        "name": "Activity"
       }
     }
   },
   "issues": {
     "intents_missing": {
       "title": "Discord refuses the intents of a bot",
-      "description": "Discord closed the connection of {bot} because an intent is not enabled. Turn on the “Message Content Intent” on the Bot page in the Developer Portal, or turn off receiving messages in the options of the bot."
+      "description": "Discord closed the connection of {bot} because an intent is not enabled. On the \"Bot\" page in the Developer Portal, turn on the \"Message Content Intent\" (to receive messages) and the \"Presence Intent\" (for member status), or turn the feature off in the bot's options."
     },
     "commands_not_allowed": {
       "title": "Discord refuses the commands of a bot",

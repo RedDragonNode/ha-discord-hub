@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 from typing import Any
 
@@ -221,3 +222,49 @@ async def test_close_ends_the_run_and_clears_the_state():
     assert not client.connected
     assert client.latency is None
     assert recorder.status[-1] is False
+
+
+@pytest.mark.parametrize(
+    ("first", "reason"),
+    [
+        (FakeWS(HELLO, READY, {"op": 7, "d": None}), "reconnect_requested"),
+        (FakeWS(HELLO, READY, {"op": 9, "d": False}), "invalid_session"),
+        (FakeWS(HELLO, READY, {"op": 9, "d": True}), "invalid_session_resumable"),
+        (FakeWS(HELLO, READY, 1006), "closed_1006"),
+        (FakeWS(HELLO, READY, auto_ack=False), "heartbeat_timeout"),
+        (FakeWS({"op": 0}), "no_hello"),
+    ],
+)
+async def test_the_reason_of_a_dropped_connection_is_kept(first, reason):
+    client = Recorder().client(FakeSession(first, FakeWS(HELLO, 4004)))
+    await client.run()
+    assert client.stats.reconnects == 1
+    assert client.stats.last_reason == reason
+    assert client.stats.last_disconnected is not None
+
+
+async def test_network_errors_are_counted_with_their_type():
+    client = Recorder().client(FakeSession())  # die erste Verbindung scheitert
+    task = asyncio.create_task(client.run())
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if client.stats.reconnects:
+            break
+    await client.close()
+    await asyncio.wait_for(task, 2)
+    assert client.stats.last_reason == "network_ClientError"
+
+
+async def test_sessions_and_resumes_are_counted(caplog):
+    caplog.set_level(logging.INFO)
+    first = FakeWS(HELLO, READY, {"op": 7, "d": None})
+    second = FakeWS(HELLO, dispatch("RESUMED", 2), 1006)
+    third = FakeWS(HELLO, 4004)
+    client = Recorder().client(FakeSession(first, second, third))
+    await client.run()
+    stats = client.stats
+    assert (stats.sessions, stats.resumes, stats.reconnects) == (1, 1, 2)
+    assert stats.last_reason == "closed_1006"
+    assert stats.last_connected is not None
+    assert "endete (reconnect_requested)" in caplog.text
+    assert "Sitzung fortgesetzt" in caplog.text

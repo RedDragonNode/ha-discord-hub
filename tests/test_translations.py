@@ -80,3 +80,19 @@ def test_no_urls_in_texts(texts: dict[str, dict[str, str]], lang: str) -> None:
     """Hassfest lehnt Adressen in Übersetzungen ab."""
     for key, text in texts[lang].items():
         assert "http" not in text, f"{lang}: {key}"
+
+
+def test_every_entity_is_named_in_both_languages(texts: dict[str, dict[str, str]]) -> None:
+    """Jeder `translation_key` einer Entity hat einen Namen, die dynamischen der Server-Sensoren eingeschlossen."""
+    used: dict[str, set[str]] = {}
+    for source in ("sensor", "binary_sensor"):
+        code = (COMPONENT / f"{source}.py").read_text(encoding="utf-8")
+        used[source] = set(re.findall(r'_attr_translation_key = "(\w+)"', code))
+    used["sensor"] |= {"server_members", "server_online"}  # sensor.py baut sie aus f"server_{key}"
+    assert used["sensor"] >= {"voice_users", "member_status", "member_activity"}
+    for lang, entries in texts.items():
+        for domain, keys in used.items():
+            for key in keys:
+                assert f"entity.{domain}.{key}.name" in entries, f"{lang}: {domain}.{key}"
+        for state in ("online", "idle", "dnd", "offline"):
+            assert f"entity.sensor.member_status.state.{state}" in entries, f"{lang}: {state}"

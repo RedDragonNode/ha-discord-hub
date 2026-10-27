@@ -196,6 +196,16 @@ class BotApi(_Http):
     async def get_channel(self, channel_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/channels/{channel_id}")
 
+    async def get_guild_counts(self, guild_id: str) -> dict[str, Any]:
+        """Der Server mit `approximate_member_count` und `approximate_presence_count` (ohne privilegierten Intent)."""
+        return await self.request("GET", f"/guilds/{guild_id}", params={"with_counts": "true"})
+
+    async def get_member(self, guild_id: str, user_id: str) -> dict[str, Any]:
+        return await self.request("GET", f"/guilds/{guild_id}/members/{user_id}")
+
+    async def get_user(self, user_id: str) -> dict[str, Any]:
+        return await self.request("GET", f"/users/{user_id}")
+
     async def create_dm(self, user_id: str) -> dict[str, Any]:
         return await self.request("POST", "/users/@me/channels", payload={"recipient_id": user_id})
 

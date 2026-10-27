@@ -26,8 +26,11 @@ from custom_components.discord_hub.const import (
     KIND_WEBHOOK,
     SUBENTRY_CHANNEL,
     SUBENTRY_COMMAND,
+    SUBENTRY_MEMBER,
+    SUBENTRY_SERVER,
     SUBENTRY_USER,
 )
+from custom_components.discord_hub.gateway import GatewayStats
 
 API = "https://discord.com/api/v10"
 TOKEN = "bot-token-geheim-123"
@@ -72,6 +75,7 @@ class FakeGateway:
         self.on_fatal = on_fatal
         self.connected = False
         self.latency = None
+        self.stats = GatewayStats()
         self.closed = False
         FakeGateway.instances.append(self)
 
@@ -162,6 +166,26 @@ def command_subentry(**changes: Any) -> ConfigSubentryData:
     }
     return ConfigSubentryData(
         data=data, subentry_type=SUBENTRY_COMMAND, title=f"/{data[CONF_NAME]}", unique_id=f"cmd_1_{data[CONF_NAME]}"
+    )
+
+
+def server_subentry(guild_id: str = "1", name: str = "Fuchsbau") -> ConfigSubentryData:
+    """Der Server „Fuchsbau“, dessen Zahlen und Sprachkanäle beobachtet werden."""
+    return ConfigSubentryData(
+        data={CONF_GUILD_ID: guild_id, CONF_NAME: name},
+        subentry_type=SUBENTRY_SERVER,
+        title=name,
+        unique_id=f"server_{guild_id}",
+    )
+
+
+def member_subentry(user_id: str = "555", name: str = "Stefan", guild_id: str = "1") -> ConfigSubentryData:
+    """Das Mitglied Stefan auf Server 1."""
+    return ConfigSubentryData(
+        data={CONF_GUILD_ID: guild_id, CONF_USER_ID: user_id, CONF_NAME: name},
+        subentry_type=SUBENTRY_MEMBER,
+        title=name,
+        unique_id=f"member_{guild_id}_{user_id}",
     )
 
 

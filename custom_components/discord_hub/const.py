@@ -21,10 +21,13 @@ CONF_USER_ID = "user_id"
 SUBENTRY_CHANNEL = "channel"
 SUBENTRY_USER = "user"
 SUBENTRY_COMMAND = "command"
+SUBENTRY_SERVER = "server"
+SUBENTRY_MEMBER = "member"
 
 # Optionen eines Bots (Hören auf Discord)
 OPT_LISTEN = "listen"
 OPT_RECEIVE_MESSAGES = "receive_messages"
+OPT_TRACK_PRESENCE = "track_presence"
 OPT_ALLOWED_USERS = "allowed_users"
 OPT_ALLOWED_ROLES = "allowed_roles"
 
@@ -42,6 +45,11 @@ EVENT_COMMAND = f"{DOMAIN}_command"
 EVENT_BUTTON = f"{DOMAIN}_button"
 EVENT_REACTION = f"{DOMAIN}_reaction"
 EVENT_MESSAGE = f"{DOMAIN}_message"
+
+# Wie oft die Mitgliederzahlen eines Servers bei Discord abgefragt werden
+COUNTS_REFRESH_SECONDS = 300
+# So lange darf die Verbindung weg sein, bevor die Sensoren aus dem Gateway „nicht verfügbar“ melden
+OFFLINE_GRACE_SECONDS = 30
 
 # Wie lange eine Interaktion beantwortet werden kann (Discord erlaubt 15 Minuten)
 INTERACTION_SECONDS = 14 * 60

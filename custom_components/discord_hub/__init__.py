@@ -21,7 +21,7 @@ from .services import async_register_services
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.NOTIFY, Platform.EVENT, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.NOTIFY, Platform.EVENT, Platform.BINARY_SENSOR, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type DiscordHubConfigEntry = ConfigEntry[DiscordRuntime]

@@ -21,6 +21,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 | eine Nachricht ändern, löschen, anheften oder mit einem Emoji versehen | `edit_message`, `delete_message`, `pin_message`, `add_reaction` |
 | einen Thread archivieren, sperren oder umbenennen | `update_thread` |
 | die Tags eines Forums nachsehen | `list_forum_tags` |
+| Mitglieder, Online-Status und Sprachkanäle eines Servers sehen | Sensoren, mit *Server beobachten* und *Mitglied beobachten* angelegt |
 | auf Befehle, Buttons und Reaktionen aus Discord reagieren | Ereignisse `discord_hub_command`, `discord_hub_button`, `discord_hub_reaction`, Antwort mit `respond` |
 | einfach Text schicken wie bei jeder Benachrichtigung | `notify.send_message` auf der Kanal-Entity |
 
@@ -37,7 +38,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 
 | Art | Was du eingibst | Was du bekommst |
 |---|---|---|
-| **Bot** | der Token | ein Eintrag je Bot. Dazu fügst du **Kanäle** und **Direktnachrichten** als Untereinträge hinzu |
+| **Bot** | der Token | ein Eintrag je Bot. Dazu fügst du **Kanäle**, **Direktnachrichten**, **Befehle**, **Server** und **Mitglieder** als Untereinträge hinzu |
 | **Webhook** | Name und Adresse (*Kanaleinstellungen → Integrationen → Webhooks → Adresse kopieren*) | ein Eintrag je Webhook mit einer `notify`-Entity. Er schreibt nur in den Kanal, zu dem er gehört |
 
 **Kanäle** (*Discord Hub → Kanal hinzufügen*): Du wählst aus den Kanälen des Servers (Text, Ankündigungen, Sprache, Forum, Media), ohne IDs abzutippen. Jeder Kanal bekommt ein Gerät mit einer `notify`-Entity. Diese Entity wählst du in den Diensten als Ziel. **Direktnachrichten** (*Direktnachrichten hinzufügen*) gehen an eine Nutzer-ID (Entwicklermodus in Discord, Rechtsklick auf den Nutzer, *Nutzer-ID kopieren*). Der Bot erreicht nur Nutzer, die mit ihm einen Server teilen.
@@ -145,6 +146,7 @@ Befehle, Button-Klicks und Reaktionen aus Discord kommen als **Ereignisse** in H
 |---|---|
 | **Auf Discord hören** | der Bot baut die Verbindung auf, auch wenn er keinen Befehl hat (für Buttons und Reaktionen) |
 | **Nachrichten empfangen** | zusätzlich das Ereignis `discord_hub_message` für Nachrichten. Braucht den **Message Content Intent** (*Developer Portal → Bot → Privileged Gateway Intents*). Fehlt er, beendet Discord die Verbindung, und unter *Reparaturen* steht ein Hinweis |
+| **Status der Mitglieder verfolgen** | Status und Aktivität der beobachteten Mitglieder (siehe *Beobachten*). Braucht den **Presence Intent** |
 | **Erlaubte Nutzer** und **Erlaubte Rollen** (IDs) | begrenzen, wer Buttons drücken und reagieren darf (leer: jeder). Befehle ohne eigene Liste benutzen sie |
 
 ### Slash-Befehle
@@ -221,9 +223,43 @@ Antwortet auf einen Befehl oder Button-Klick, bis zu 14 Minuten danach.
 
 `discord_hub_reaction` kommt, wenn jemand eine Reaktion setzt oder entfernt (`action: add` oder `remove`, dazu `emoji`, `emoji_id`, `message_id` und der Nutzer). Reaktionen des Bots selbst werden übergangen. `discord_hub_message` (nur mit **Nachrichten empfangen**) kommt für jede Nachricht eines Menschen mit `content`, `message_id`, `reply_to` und dem Nutzer. Beide folgen den erlaubten Nutzern und Rollen der Optionen.
 
+## Beobachten
+
+Der Bot kann melden, was auf deinem Server los ist: wie viele Mitglieder da sind, wer in einem Sprachkanal sitzt und welchen Status ein Mitglied hat. Dafür baut er dieselbe Verbindung zu Discord auf wie beim Empfangen (siehe oben). Du legst unter *Discord Hub* einen **Server** oder ein **Mitglied** als Untereintrag an.
+
+### Server
+
+*Discord Hub → Server beobachten* legt ein Gerät mit drei Sensoren an:
+
+| Sensor | Inhalt |
+|---|---|
+| **Mitglieder** | die Zahl der Mitglieder |
+| **Online** | die Zahl der Mitglieder, die gerade online sind |
+| **In Sprachkanälen** | wie viele Nutzer in Sprachkanälen sind. Das Attribut `channels` zeigt, wer in welchem Kanal sitzt |
+
+**Mitglieder** und **Online** fragt die Integration alle fünf Minuten bei Discord ab. Discord liefert **ungefähre** Zahlen und verlangt dafür keinen besonderen Intent. **In Sprachkanälen** kommt sofort aus der Verbindung und braucht ebenfalls keinen privilegierten Intent. Als Name eines Nutzers steht der, den Discord beim Beitritt mitschickt, sonst der eines beobachteten Mitglieds, sonst seine ID.
+
+### Mitglieder
+
+*Discord Hub → Mitglied beobachten* legt ein Gerät für ein Mitglied an. Die Nutzer-ID kopierst du in Discord (Entwicklermodus, Rechtsklick auf den Nutzer, *Nutzer-ID kopieren*).
+
+| Entity | Inhalt |
+|---|---|
+| **Im Sprachkanal** (`binary_sensor`) | an, wenn das Mitglied in einem Sprachkanal sitzt. Attribute: `channel` und `channel_id` |
+| **Status** (`sensor`) | `online`, `idle`, `dnd` oder `offline`. Attribut `platforms`: `desktop`, `mobile`, `web` |
+| **Aktivität** (`sensor`) | das Spiel oder die Musik, sonst der eigene Status-Text des Mitglieds. Attribute: `type`, `details`, `state`, `activities`. Ohne Aktivität steht dort `unknown` |
+
+**Status** und **Aktivität** gibt es nur, wenn unter *Konfigurieren* des Bots **Status der Mitglieder verfolgen** an ist. Das braucht den **Presence Intent** (*Developer Portal → Bot → Privileged Gateway Intents*). Fehlt er, beendet Discord die Verbindung, und unter *Reparaturen* steht ein Hinweis. Ohne die Option gibt es nur **Im Sprachkanal**. Wer Discord nicht freigibt (zum Beispiel unsichtbar), steht auf `offline`.
+
+Die Sensoren, deren Werte aus der Verbindung kommen, zeigen „nicht verfügbar“, wenn die Verbindung länger als 30 Sekunden weg ist. Kurze Neuverbindungen, die Discord regelmäßig verlangt, sieht man ihnen nicht an.
+
+### Die Verbindung
+
+Der Sensor **Verbunden** am Gerät des Bots zeigt in seinen Attributen, wie oft und warum die Verbindung neu aufgebaut wurde: `sessions` (neue Anmeldungen), `resumes` (fortgesetzte Sitzungen), `reconnects`, `last_reason` (zum Beispiel `reconnect_requested`, wenn Discord es verlangt hat) sowie `last_connected` und `last_disconnected`. Jede Neuverbindung steht außerdem im Protokoll auf der Stufe INFO (`logger:` mit `custom_components.discord_hub: info`).
+
 ## Grenzen
 
-- Der Bot **sendet, verwaltet und empfängt**. Status-Sensoren und fertige Meldungen für Spiel Saison, Cam Profile und Ctronics kommen in den nächsten Versionen (siehe unten).
+- Der Bot **sendet, verwaltet, empfängt und beobachtet**. Fertige Meldungen für Spiel Saison, Cam Profile und Ctronics kommen in der nächsten Version (siehe unten).
 - Ein Webhook kann nicht lesen und nur Nachrichten sowie Forum-Posts erzeugen. Reaktionen, Anheften, Threads ändern und Tag-Namen brauchen einen Bot.
 - Discord begrenzt Anfragen. Die Integration wartet bei einer Bremse bis zu 30 Sekunden und wiederholt dann. Ein Fehler beim Senden einer **neuen** Nachricht wird nicht wiederholt, damit nichts doppelt ankommt.
 
@@ -231,7 +267,6 @@ Antwortet auf einen Befehl oder Button-Klick, bis zu 14 Minuten danach.
 
 | Version | Inhalt |
 |---|---|
-| 0.3 | Status-Sensoren: Mitglieder, Anwesenheit, Sprachkanäle |
 | 0.4 | Zusammenspiel: Meldungen mit Vorlagen für Spiel Saison, Cam Profile und Ctronics |
 
 ## Entwicklung

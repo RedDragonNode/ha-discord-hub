@@ -12,6 +12,8 @@ import json
 import logging
 import random
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -33,6 +35,8 @@ OP_HEARTBEAT_ACK = 11
 
 # Intents (welche Ereignisse Discord schickt)
 INTENT_GUILDS = 1 << 0
+INTENT_GUILD_VOICE_STATES = 1 << 7
+INTENT_GUILD_PRESENCES = 1 << 8  # privilegiert: im Developer Portal freischalten
 INTENT_GUILD_MESSAGES = 1 << 9
 INTENT_GUILD_MESSAGE_REACTIONS = 1 << 10
 INTENT_DIRECT_MESSAGES = 1 << 12
@@ -61,6 +65,18 @@ FatalHandler = Callable[[str], None]
 async def _sleep(seconds: float) -> None:
     """Warten (eigene Funktion, damit Tests nicht wirklich warten müssen)."""
     await asyncio.sleep(seconds)
+
+
+@dataclass
+class GatewayStats:
+    """Wie oft und warum die Verbindung neu aufgebaut wurde (sichtbar am Sensor „Verbunden“)."""
+
+    sessions: int = 0  # neue Anmeldungen
+    resumes: int = 0  # fortgesetzte Sitzungen
+    reconnects: int = 0  # beendete Verbindungen
+    last_reason: str | None = None
+    last_connected: datetime | None = None
+    last_disconnected: datetime | None = None
 
 
 class GatewayFatal(Exception):
@@ -100,8 +116,10 @@ class GatewayClient:
         self._heartbeat_sent = 0.0
         self._tasks: set[asyncio.Task[None]] = set()
         self._failures = 0
+        self._reason: str | None = None  # warum die laufende Verbindung endet
         self.connected = False
         self.latency: float | None = None
+        self.stats = GatewayStats()
 
     # ------------------------------------------------------------------ Lauf
     async def run(self) -> None:
@@ -118,14 +136,23 @@ class GatewayClient:
             except asyncio.CancelledError:
                 raise
             except (aiohttp.ClientError, TimeoutError, OSError) as err:
-                _LOGGER.debug("Verbindung zu Discord abgebrochen: %s", type(err).__name__)
+                self._reason = self._reason or f"network_{type(err).__name__}"
             except Exception:
+                self._reason = "error"
                 _LOGGER.exception("Unerwarteter Fehler in der Verbindung zu Discord")
             self._set_connected(False)
             if self._closing:
                 break
+            self._note_drop()
             self._failures += 1
             await _sleep(min(2.0 ** (self._failures - 1), MAX_BACKOFF))
+
+    def _note_drop(self) -> None:
+        reason, self._reason = self._reason or "unknown", None
+        self.stats.reconnects += 1
+        self.stats.last_reason = reason
+        self.stats.last_disconnected = datetime.now(UTC)
+        _LOGGER.info("Die Verbindung zu Discord endete (%s), sie wird neu aufgebaut", reason)
 
     async def close(self) -> None:
         """Verbindung beenden und alle laufenden Aufgaben abbrechen."""
@@ -153,6 +180,7 @@ class GatewayClient:
         try:
             hello = await self._next(ws)
             if not hello or hello.get("op") != OP_HELLO:
+                self._reason = "no_hello"
                 return
             interval = hello["d"]["heartbeat_interval"] / 1000
             self._ack = True
@@ -161,6 +189,7 @@ class GatewayClient:
             while True:
                 message = await self._next(ws)
                 if message is None:
+                    self._reason = self._reason or f"closed_{ws.close_code}"
                     self._handle_close(ws.close_code)
                     return
                 if not await self._handle(ws, message):
@@ -218,7 +247,7 @@ class GatewayClient:
         await _sleep(interval * random.random())
         while True:
             if not self._ack:
-                _LOGGER.debug("Discord bestätigt den Herzschlag nicht, die Verbindung wird neu aufgebaut")
+                self._reason = "heartbeat_timeout"
                 await ws.close(code=4000)
                 return
             await self._send_heartbeat(ws)
@@ -242,9 +271,11 @@ class GatewayClient:
             self._ack = True
             self.latency = asyncio.get_running_loop().time() - self._heartbeat_sent
         elif op == OP_RECONNECT:
+            self._reason = "reconnect_requested"
             await ws.close(code=4000)  # die Sitzung bleibt erhalten und wird fortgesetzt
             return False
         elif op == OP_INVALID_SESSION:
+            self._reason = "invalid_session" if not message.get("d") else "invalid_session_resumable"
             if not message.get("d"):
                 self._reset_session()
             await _sleep(random.uniform(1, 5))
@@ -257,9 +288,15 @@ class GatewayClient:
             self._session_id = data.get("session_id")
             self._resume_url = data.get("resume_gateway_url")
             self._failures = 0
+            self.stats.sessions += 1
+            self.stats.last_connected = datetime.now(UTC)
+            _LOGGER.info("Mit Discord verbunden (neue Sitzung)")
             self._set_connected(True)
         elif name == "RESUMED":
             self._failures = 0
+            self.stats.resumes += 1
+            self.stats.last_connected = datetime.now(UTC)
+            _LOGGER.info("Mit Discord verbunden (Sitzung fortgesetzt)")
             self._set_connected(True)
         # jedes Ereignis in einer eigenen Aufgabe, damit ein langsamer Handler den Herzschlag nicht aufhält
         task = asyncio.create_task(self._safely(name, data))

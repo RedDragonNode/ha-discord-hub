@@ -21,6 +21,7 @@ It can run next to the built-in `discord` integration. Both may use the same bot
 | edit, delete, pin or react to a message | `edit_message`, `delete_message`, `pin_message`, `add_reaction` |
 | archive, lock or rename a thread | `update_thread` |
 | look up the tags of a forum | `list_forum_tags` |
+| see members, online status and voice channels of a server | sensors, created with *Watch a server* and *Watch a member* |
 | react to commands, buttons and reactions from Discord | events `discord_hub_command`, `discord_hub_button`, `discord_hub_reaction`, answer with `respond` |
 | just send text like any notification | `notify.send_message` on the channel entity |
 
@@ -37,7 +38,7 @@ It can run next to the built-in `discord` integration. Both may use the same bot
 
 | Kind | You enter | You get |
 |---|---|---|
-| **Bot** | the token | one entry per bot. You add **channels** and **direct messages** to it as sub-entries |
+| **Bot** | the token | one entry per bot. You add **channels**, **direct messages**, **commands**, **servers** and **members** to it as sub-entries |
 | **Webhook** | a name and the address (*channel settings → Integrations → Webhooks → copy address*) | one entry per webhook with one `notify` entity. It writes only into the channel it belongs to |
 
 **Channels** (*Discord Hub → Add channel*): you pick from the channels of the server (text, announcement, voice, forum, media) without typing IDs. Every channel gets a device with one `notify` entity, which you choose as the target of the actions. **Direct messages** (*Add direct messages*) go to a user ID (developer mode in Discord, right click the user, *Copy user ID*). The bot can only reach users who share a server with it.
@@ -145,6 +146,7 @@ Commands, button clicks and reactions from Discord arrive in Home Assistant as *
 |---|---|
 | **Listen to Discord** | the bot opens the connection even if it has no command (for buttons and reactions) |
 | **Receive messages** | additionally the event `discord_hub_message` for messages. Needs the **Message Content Intent** (*Developer Portal → Bot → Privileged Gateway Intents*). If it is missing Discord closes the connection and a notice appears under *Repairs* |
+| **Track member status** | status and activity of the watched members (see *Watching*). Needs the **Presence Intent** |
 | **Allowed users** and **Allowed roles** (IDs) | limit who can press buttons and react (empty: everyone). Commands without a list of their own use them |
 
 ### Slash commands
@@ -221,9 +223,43 @@ Answers a command or a button click, up to 14 minutes later.
 
 `discord_hub_reaction` arrives when someone adds or removes a reaction (`action: add` or `remove`, plus `emoji`, `emoji_id`, `message_id` and the user). Reactions of the bot itself are skipped. `discord_hub_message` (only with **Receive messages**) arrives for every message by a human with `content`, `message_id`, `reply_to` and the user. Both follow the allowed users and roles of the options.
 
+## Watching
+
+The bot can report what is going on on your server: how many members there are, who sits in a voice channel and which status a member has. For that it opens the same connection to Discord as for receiving (see above). Under *Discord Hub* you add a **server** or a **member** as a sub-entry.
+
+### Servers
+
+*Discord Hub → Watch a server* creates a device with three sensors:
+
+| Sensor | Content |
+|---|---|
+| **Members** | the number of members |
+| **Online** | the number of members that are online right now |
+| **In voice channels** | how many users are in voice channels. The attribute `channels` shows who sits in which channel |
+
+The integration asks Discord for **Members** and **Online** every five minutes. Discord returns **approximate** numbers and needs no special intent for them. **In voice channels** comes straight from the connection and needs no privileged intent either. The name of a user is the one Discord sends when they join, otherwise that of a watched member, otherwise the ID.
+
+### Members
+
+*Discord Hub → Watch a member* creates a device for one member. Copy the user ID in Discord (developer mode, right-click the user, *Copy User ID*).
+
+| Entity | Content |
+|---|---|
+| **In voice channel** (`binary_sensor`) | on while the member sits in a voice channel. Attributes: `channel` and `channel_id` |
+| **Status** (`sensor`) | `online`, `idle`, `dnd` or `offline`. Attribute `platforms`: `desktop`, `mobile`, `web` |
+| **Activity** (`sensor`) | the game or the music, otherwise the member's own status text. Attributes: `type`, `details`, `state`, `activities`. Without an activity it reads `unknown` |
+
+**Status** and **Activity** exist only if **Track member status** is on under *Configure* of the bot. That needs the **Presence Intent** (*Developer Portal → Bot → Privileged Gateway Intents*). If it is missing Discord closes the connection and a notice appears under *Repairs*. Without the option there is only **In voice channel**. Whoever does not show up for Discord (for example invisible) reads `offline`.
+
+The sensors whose values come from the connection show "unavailable" when the connection has been gone for more than 30 seconds. Short reconnects that Discord asks for regularly are not visible in them.
+
+### The connection
+
+The **Connected** sensor on the bot's device shows in its attributes how often and why the connection was rebuilt: `sessions` (new logins), `resumes` (resumed sessions), `reconnects`, `last_reason` (for example `reconnect_requested` when Discord asked for it) as well as `last_connected` and `last_disconnected`. Every reconnect is also written to the log at INFO level (`logger:` with `custom_components.discord_hub: info`).
+
 ## Limits
 
-- The bot **sends, manages and receives**. Status sensors and ready-made notices for Spiel Saison, Cam Profile and Ctronics come in the next versions (see below).
+- The bot **sends, manages, receives and watches**. Ready-made notices for Spiel Saison, Cam Profile and Ctronics come in the next version (see below).
 - A webhook cannot read and can only create messages and forum posts. Reactions, pinning, changing threads and tag names need a bot.
 - Discord limits requests. When it slows us down the integration waits up to 30 seconds and then retries. A failed attempt to send a **new** message is not retried, so nothing arrives twice.
 
@@ -231,7 +267,6 @@ Answers a command or a button click, up to 14 minutes later.
 
 | Version | Content |
 |---|---|
-| 0.3 | Status sensors: members, presence, voice channels |
 | 0.4 | Working together: notices with templates for Spiel Saison, Cam Profile and Ctronics |
 
 ## Development

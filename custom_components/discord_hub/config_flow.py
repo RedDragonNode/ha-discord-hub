@@ -63,9 +63,12 @@ from .const import (
     OPT_ALLOWED_USERS,
     OPT_LISTEN,
     OPT_RECEIVE_MESSAGES,
+    OPT_TRACK_PRESENCE,
     SELECTABLE_CHANNELS,
     SUBENTRY_CHANNEL,
     SUBENTRY_COMMAND,
+    SUBENTRY_MEMBER,
+    SUBENTRY_SERVER,
     SUBENTRY_USER,
 )
 
@@ -83,6 +86,7 @@ OPTIONS_SCHEMA = vol.Schema(
     {
         vol.Optional(OPT_LISTEN, default=False): _BOOL,
         vol.Optional(OPT_RECEIVE_MESSAGES, default=False): _BOOL,
+        vol.Optional(OPT_TRACK_PRESENCE, default=False): _BOOL,
         vol.Optional(OPT_ALLOWED_USERS, default=[]): _IDS,
         vol.Optional(OPT_ALLOWED_ROLES, default=[]): _IDS,
     }
@@ -219,6 +223,8 @@ class DiscordHubConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_CHANNEL: ChannelSubentryFlow,
             SUBENTRY_USER: UserSubentryFlow,
             SUBENTRY_COMMAND: CommandSubentryFlow,
+            SUBENTRY_SERVER: ServerSubentryFlow,
+            SUBENTRY_MEMBER: MemberSubentryFlow,
         }
 
     @classmethod
@@ -233,7 +239,7 @@ class DiscordHubConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class DiscordHubOptionsFlow(OptionsFlow):
-    """Ob der Bot auf Discord hört und wer Buttons und Reaktionen auslösen darf."""
+    """Ob der Bot auf Discord hört, wen er beobachtet und wer Buttons und Reaktionen auslösen darf."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -247,6 +253,7 @@ class DiscordHubOptionsFlow(OptionsFlow):
                     data={
                         OPT_LISTEN: bool(user_input.get(OPT_LISTEN)),
                         OPT_RECEIVE_MESSAGES: bool(user_input.get(OPT_RECEIVE_MESSAGES)),
+                        OPT_TRACK_PRESENCE: bool(user_input.get(OPT_TRACK_PRESENCE)),
                         OPT_ALLOWED_USERS: users,
                         OPT_ALLOWED_ROLES: roles,
                     }
@@ -268,19 +275,8 @@ class _BotSubentryFlow(ConfigSubentryFlow):
         return BotApi(async_get_clientsession(self.hass), self._get_entry().data[CONF_TOKEN])
 
 
-def _channel_label(channel: Mapping[str, Any]) -> str:
-    """Anzeige in der Auswahl: # Text, 📢 Ankündigungen, 🔊 Sprache, Name (Forum) und Name (Media)."""
-    name = channel["name"]
-    return {
-        CHANNEL_ANNOUNCEMENT: f"📢 {name}",
-        CHANNEL_VOICE: f"🔊 {name}",
-        CHANNEL_FORUM: f"{name} (Forum)",
-        CHANNEL_MEDIA: f"{name} (Media)",
-    }.get(channel["type"], f"#{name}")
-
-
-class ChannelSubentryFlow(_BotSubentryFlow):
-    """Einen Kanal des Servers hinzufügen (Text, Ankündigungen, Sprache, Forum, Media)."""
+class _GuildSubentryFlow(_BotSubentryFlow):
+    """Erster Schritt: der Server. Er entfällt, wenn der Bot nur auf einem ist."""
 
     _guild: dict[str, Any] | None = None
 
@@ -295,10 +291,10 @@ class ChannelSubentryFlow(_BotSubentryFlow):
             return self.async_abort(reason="no_guilds")
         if len(guilds) == 1:
             self._guild = guilds[0]
-            return await self.async_step_channel()
+            return await self._guild_chosen()
         if user_input is not None:
             self._guild = next(g for g in guilds if str(g["id"]) == user_input[CONF_GUILD_ID])
-            return await self.async_step_channel()
+            return await self._guild_chosen()
         options = [selector.SelectOptionDict(value=str(g["id"]), label=g["name"]) for g in guilds]
         return self.async_show_form(
             step_id="user",
@@ -310,6 +306,27 @@ class ChannelSubentryFlow(_BotSubentryFlow):
                 }
             ),
         )
+
+    async def _guild_chosen(self) -> SubentryFlowResult:
+        raise NotImplementedError
+
+
+def _channel_label(channel: Mapping[str, Any]) -> str:
+    """Anzeige in der Auswahl: # Text, 📢 Ankündigungen, 🔊 Sprache, Name (Forum) und Name (Media)."""
+    name = channel["name"]
+    return {
+        CHANNEL_ANNOUNCEMENT: f"📢 {name}",
+        CHANNEL_VOICE: f"🔊 {name}",
+        CHANNEL_FORUM: f"{name} (Forum)",
+        CHANNEL_MEDIA: f"{name} (Media)",
+    }.get(channel["type"], f"#{name}")
+
+
+class ChannelSubentryFlow(_GuildSubentryFlow):
+    """Einen Kanal des Servers hinzufügen (Text, Ankündigungen, Sprache, Forum, Media)."""
+
+    async def _guild_chosen(self) -> SubentryFlowResult:
+        return await self.async_step_channel()
 
     async def async_step_channel(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         assert self._guild is not None
@@ -398,37 +415,11 @@ class UserSubentryFlow(_BotSubentryFlow):
         )
 
 
-class CommandSubentryFlow(_BotSubentryFlow):
+class CommandSubentryFlow(_GuildSubentryFlow):
     """Einen Slash-Befehl anlegen (oder bearbeiten): Name, Optionen, Antwort und wer ihn benutzen darf."""
 
-    _guild: dict[str, Any] | None = None
-
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        try:
-            guilds = await self._api().get_guilds()
-        except DiscordAuthError:
-            return self.async_abort(reason="invalid_auth")
-        except DiscordError:
-            return self.async_abort(reason="cannot_connect")
-        if not guilds:
-            return self.async_abort(reason="no_guilds")
-        if len(guilds) == 1:
-            self._guild = guilds[0]
-            return await self.async_step_command()
-        if user_input is not None:
-            self._guild = next(g for g in guilds if str(g["id"]) == user_input[CONF_GUILD_ID])
-            return await self.async_step_command()
-        options = [selector.SelectOptionDict(value=str(g["id"]), label=g["name"]) for g in guilds]
-        return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_GUILD_ID): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
-                    )
-                }
-            ),
-        )
+    async def _guild_chosen(self) -> SubentryFlowResult:
+        return await self.async_step_command()
 
     async def async_step_command(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         assert self._guild is not None
@@ -507,3 +498,73 @@ class CommandSubentryFlow(_BotSubentryFlow):
             CONF_USERS: users,
             CONF_ROLES: roles,
         }, None
+
+
+# ---------------------------------------------------------------------- Server und Mitglieder beobachten
+class ServerSubentryFlow(_GuildSubentryFlow):
+    """Einen Server beobachten: Mitglieder, Mitglieder online und wer in Sprachkanälen ist."""
+
+    async def _guild_chosen(self) -> SubentryFlowResult:
+        assert self._guild is not None
+        guild_id = str(self._guild["id"])
+        unique_id = f"server_{guild_id}"
+        if any(s.unique_id == unique_id for s in self._get_entry().subentries.values()):
+            return self.async_abort(reason="already_configured")
+        return self.async_create_entry(
+            title=self._guild["name"],
+            data={CONF_GUILD_ID: guild_id, CONF_NAME: self._guild["name"]},
+            unique_id=unique_id,
+        )
+
+
+class MemberSubentryFlow(_GuildSubentryFlow):
+    """Ein Mitglied beobachten: sein Status, seine Aktivität und ob es in einem Sprachkanal ist."""
+
+    async def _guild_chosen(self) -> SubentryFlowResult:
+        return await self.async_step_member()
+
+    async def async_step_member(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        assert self._guild is not None
+        guild_id = str(self._guild["id"])
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            user_id = user_input[CONF_USER_ID].strip()
+            unique_id = f"member_{guild_id}_{user_id}"
+            if not user_id.isdigit():
+                errors["base"] = "invalid_user"
+            elif any(s.unique_id == unique_id for s in self._get_entry().subentries.values()):
+                return self.async_abort(reason="already_configured")
+            else:
+                try:
+                    name = await self._member_name(guild_id, user_id)
+                except DiscordAuthError:
+                    return self.async_abort(reason="invalid_auth")
+                except DiscordNotFoundError:
+                    errors["base"] = "unknown_member"
+                except DiscordError:
+                    errors["base"] = "cannot_connect"
+                else:
+                    return self.async_create_entry(
+                        title=name,
+                        data={CONF_GUILD_ID: guild_id, CONF_USER_ID: user_id, CONF_NAME: name},
+                        unique_id=unique_id,
+                    )
+        return self.async_show_form(
+            step_id="member",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema({vol.Required(CONF_USER_ID): _TEXT}), user_input or {}
+            ),
+            errors=errors,
+            description_placeholders={"guild": self._guild["name"]},
+        )
+
+    async def _member_name(self, guild_id: str, user_id: str) -> str:
+        """Der Anzeigename des Mitglieds auf dem Server. Er prüft zugleich, dass es dort ist."""
+        try:
+            member = await self._api().get_member(guild_id, user_id)
+        except DiscordForbiddenError:
+            # ohne den Server-Members-Intent verweigert Discord die Abfrage; der Nutzer selbst ist erreichbar
+            user = await self._api().get_user(user_id)
+            return str(user.get("global_name") or user["username"])
+        user = member.get("user") or {}
+        return str(member.get("nick") or user.get("global_name") or user.get("username") or user_id)

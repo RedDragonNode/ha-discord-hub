@@ -12,9 +12,10 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import callback
+from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_call_later
 
 from .api import (
     BotApi,
@@ -26,24 +27,32 @@ from .api import (
 )
 from .commands import CommandConfig, clean_ids, commands_of
 from .const import (
+    CONF_NAME,
     CONF_TOKEN,
+    CONF_USER_ID,
     DOMAIN,
     EVENT_BUTTON,
     EVENT_COMMAND,
     EVENT_MESSAGE,
     EVENT_REACTION,
     INTERACTION_SECONDS,
+    OFFLINE_GRACE_SECONDS,
     OPT_ALLOWED_ROLES,
     OPT_ALLOWED_USERS,
     OPT_LISTEN,
     OPT_RECEIVE_MESSAGES,
+    OPT_TRACK_PRESENCE,
     RESPOND_GRACE_SECONDS,
+    SUBENTRY_MEMBER,
+    SUBENTRY_SERVER,
 )
 from .gateway import (
     INTENT_DIRECT_MESSAGE_REACTIONS,
     INTENT_DIRECT_MESSAGES,
     INTENT_GUILD_MESSAGE_REACTIONS,
     INTENT_GUILD_MESSAGES,
+    INTENT_GUILD_PRESENCES,
+    INTENT_GUILD_VOICE_STATES,
     INTENT_GUILDS,
     INTENT_MESSAGE_CONTENT,
     REASON_AUTH,
@@ -51,6 +60,8 @@ from .gateway import (
     GatewayClient,
 )
 from .messages import build_payload
+from .monitor import EVENTS as MONITOR_EVENTS
+from .monitor import Monitor
 
 if TYPE_CHECKING:
     from .event import DiscordCommandEvent
@@ -116,7 +127,11 @@ class Listener:
         self.gateway: GatewayClient | None = None
         self._interactions: dict[str, Interaction] = {}
         self._tasks: set[asyncio.Task[Any]] = set()
-        self.signal = f"{DOMAIN}_{self.entry.entry_id}_status"
+        self.monitor = Monitor()
+        self.signal = f"{DOMAIN}_{self.entry.entry_id}_status"  # Verbindung steht oder bricht ab
+        self.state_signal = f"{DOMAIN}_{self.entry.entry_id}_state"  # Zustand der Server hat sich geändert
+        self.live = False  # die Werte aus dem Gateway sind aktuell (Verbindung steht oder bricht nur kurz ab)
+        self._offline_timer: CALLBACK_TYPE | None = None
 
     # ------------------------------------------------------------------ Einstellungen
     @property
@@ -124,9 +139,31 @@ class Listener:
         return commands_of(self.entry)
 
     @property
+    def monitored(self) -> bool:
+        """Es gibt Server oder Mitglieder, deren Zustand aus dem Gateway kommt."""
+        return any(s.subentry_type in (SUBENTRY_SERVER, SUBENTRY_MEMBER) for s in self.entry.subentries.values())
+
+    @property
+    def track_presence(self) -> bool:
+        """Der Status der Mitglieder wird verfolgt (Option an und mindestens ein Mitglied)."""
+        return bool(
+            self.entry.options.get(OPT_TRACK_PRESENCE)
+            and any(s.subentry_type == SUBENTRY_MEMBER for s in self.entry.subentries.values())
+        )
+
+    @property
+    def member_names(self) -> dict[str, str]:
+        """Nutzer-ID -> Name der beobachteten Mitglieder."""
+        return {
+            str(s.data[CONF_USER_ID]): str(s.data.get(CONF_NAME) or s.title)
+            for s in self.entry.subentries.values()
+            if s.subentry_type == SUBENTRY_MEMBER
+        }
+
+    @property
     def enabled(self) -> bool:
-        """Der Bot hört auf Discord, wenn es eingestellt ist oder er Befehle hat."""
-        return bool(self.entry.options.get(OPT_LISTEN) or self.commands)
+        """Der Bot hört auf Discord, wenn es eingestellt ist, er Befehle hat oder Server beobachtet."""
+        return bool(self.entry.options.get(OPT_LISTEN) or self.commands or self.monitored)
 
     @property
     def connected(self) -> bool:
@@ -141,6 +178,10 @@ class Listener:
         value = INTENT_GUILDS | INTENT_GUILD_MESSAGE_REACTIONS | INTENT_DIRECT_MESSAGE_REACTIONS
         if self.entry.options.get(OPT_RECEIVE_MESSAGES):
             value |= INTENT_GUILD_MESSAGES | INTENT_DIRECT_MESSAGES | INTENT_MESSAGE_CONTENT
+        if self.monitored:
+            value |= INTENT_GUILD_VOICE_STATES
+        if self.track_presence:
+            value |= INTENT_GUILD_PRESENCES
         return value
 
     @property
@@ -188,6 +229,7 @@ class Listener:
     async def async_stop(self) -> None:
         if self.gateway:
             await self.gateway.close()
+        self._cancel_offline_timer()
         for task in list(self._tasks):
             task.cancel()
         for interaction in self._interactions.values():
@@ -196,13 +238,35 @@ class Listener:
         self._interactions.clear()
 
     @callback
+    def _cancel_offline_timer(self) -> None:
+        if self._offline_timer:
+            self._offline_timer()
+            self._offline_timer = None
+
+    @callback
     def _on_status(self, connected: bool) -> None:
         if connected:
             ir.async_delete_issue(self.hass, DOMAIN, f"intents_{self.entry.entry_id}")
+            self._cancel_offline_timer()
+            self.live = True
+        elif self.live and self._offline_timer is None:
+            # Discord beendet Verbindungen regelmäßig und die Sitzung läuft gleich weiter: erst nach einer
+            # Weile melden die Sensoren „nicht verfügbar“
+            self._offline_timer = async_call_later(self.hass, OFFLINE_GRACE_SECONDS, self._go_offline)
         async_dispatcher_send(self.hass, self.signal)
+        async_dispatcher_send(self.hass, self.state_signal)
+
+    @callback
+    def _go_offline(self, _now: Any) -> None:
+        self._offline_timer = None
+        self.live = False
+        async_dispatcher_send(self.hass, self.state_signal)
 
     @callback
     def _on_fatal(self, reason: str) -> None:
+        self._cancel_offline_timer()
+        self.live = False
+        async_dispatcher_send(self.hass, self.state_signal)
         if reason == REASON_AUTH:
             self.entry.async_start_reauth(self.hass)
         elif reason == REASON_INTENTS:
@@ -276,7 +340,10 @@ class Listener:
 
     # ------------------------------------------------------------------ Ereignisse von Discord
     async def _dispatch(self, name: str, data: dict[str, Any]) -> None:
-        if name == "INTERACTION_CREATE":
+        if name in MONITOR_EVENTS:
+            if self.monitored and self.monitor.handle(name, data):
+                async_dispatcher_send(self.hass, self.state_signal)
+        elif name == "INTERACTION_CREATE":
             self._forget_old_interactions()
             if data.get("type") == INTERACTION_COMMAND:
                 await self._on_command(data)

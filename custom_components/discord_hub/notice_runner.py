@@ -74,7 +74,13 @@ class NoticeRunner:
     def _event_handler(self, notice: NoticeConfig) -> Callable[[Event], None]:
         @callback
         def handle(event: Event) -> None:
-            trigger = {"platform": "event", **event.data, "event_type": event.event_type}
+            trigger = {
+                "platform": "event",
+                **event.data,
+                "event_type": event.event_type,
+                # wie im Auslöser einer Automation, damit sich deren Texte übernehmen lassen
+                "event": {"event_type": event.event_type, "data": dict(event.data)},
+            }
             self._start(notice, "", {"trigger": trigger})
 
         return handle

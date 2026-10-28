@@ -641,6 +641,8 @@ class NoticeSubentryFlow(_BotSubentryFlow):
         data = dict(self._reconfigured.data)
         data[CONF_TITLE] = data.get(CONF_TITLE) or template.title[language]
         data[CONF_MESSAGE] = data.get(CONF_MESSAGE) or template.message[language]
+        if not data.get(CONF_CAMERA):
+            data.pop(CONF_CAMERA, None)  # eine leere Kamera als Vorschlag lehnt die Auswahl beim Abschicken ab
         return data
 
     # ------------------------------------------------------------------ Schritte

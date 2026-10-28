@@ -290,7 +290,7 @@ For entities only a real change counts: a sensor that has just been created, dro
 | **Minimum interval in seconds** | how long the same notice waits after sending before it sends again (300 for motion, 0 for the Spiel Saison events, 0 sends every one). For entities it counts per notice |
 | **Thread name**, **Tags**, **One thread per day** | only with a forum as target. The name is a template as well, with one thread per day all calls of the day write into the same thread |
 
-In title and text the variable `trigger` is available: for an event it holds its data (`trigger.season`, `trigger.partner`) and `trigger.event_type`, for an entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` and `trigger.to_state` (with `trigger.to_state.state` and `trigger.to_state.attributes.folder`). All functions of Home Assistant templates work (`now()`, `states()` and so on). Editing changes a notice without adding it again.
+In title and text the variable `trigger` is available: for an event it holds its data (`trigger.season`, `trigger.partner`) and `trigger.event_type` (the form of an automation, `trigger.event.data.season`, works as well), for an entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` and `trigger.to_state` (with `trigger.to_state.state` and `trigger.to_state.attributes.folder`). All functions of Home Assistant templates work (`now()`, `states()` and so on). Editing changes a notice without adding it again.
 
 **A notice never disturbs Home Assistant.** If a text is broken, the target is deleted or Discord cannot be reached, one line goes into the log and nothing else happens.
 

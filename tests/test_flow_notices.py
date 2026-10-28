@@ -212,6 +212,20 @@ async def test_reconfigure_a_notice(hass, discord):
     assert updated.title == "Spiel Saison: recording started › Stefan"
 
 
+async def test_reconfigure_sends_back_what_the_form_suggests(hass, discord):
+    entry = await setup_entry(hass, bot_entry([notice_subentry("custom_event", event_type="x")]))
+    sub = next(s for s in entry.subentries.values() if s.subentry_type == "notice")
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "notice"), context={"source": SOURCE_RECONFIGURE, "subentry_id": sub.subentry_id}
+    )
+    suggested = _suggested(result)
+    assert "camera" not in suggested  # eine leere Kamera lehnt die Auswahl ab
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], suggested)
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    assert entry.subentries[sub.subentry_id].data["camera"] == ""
+
+
 async def test_reconfigure_a_forum_notice_keeps_its_thread_settings(hass, discord):
     entry = await setup_entry(
         hass,

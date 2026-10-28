@@ -290,7 +290,7 @@ Bei Entities zählt nur ein echter Wechsel: Ein Sensor, der gerade erst entsteht
 | **Mindestabstand in Sekunden** | so lange wartet dieselbe Meldung nach dem Senden, bevor sie noch einmal sendet (bei Bewegung 300, bei Ereignissen von Spiel Saison 0, 0 sendet jede). Bei Entities zählt er je Meldung |
 | **Name des Threads**, **Tags**, **Ein Thread pro Tag** | nur bei einem Forum als Ziel. Der Name ist ebenfalls eine Vorlage, mit einem Thread pro Tag schreiben alle Aufrufe des Tages in denselben Thread |
 
-In Titel und Text steht die Variable `trigger`: Bei einem Ereignis hat sie dessen Daten (`trigger.season`, `trigger.partner`) und `trigger.event_type`, bei einer Entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` und `trigger.to_state` (mit `trigger.to_state.state` und `trigger.to_state.attributes.folder`). Alle Funktionen der Vorlagen von Home Assistant gehen (`now()`, `states()` und so weiter). Das Bearbeiten ändert eine Meldung, ohne dass du sie neu anlegen musst.
+In Titel und Text steht die Variable `trigger`: Bei einem Ereignis hat sie dessen Daten (`trigger.season`, `trigger.partner`) und `trigger.event_type` (die Schreibweise einer Automation, `trigger.event.data.season`, geht ebenso), bei einer Entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` und `trigger.to_state` (mit `trigger.to_state.state` und `trigger.to_state.attributes.folder`). Alle Funktionen der Vorlagen von Home Assistant gehen (`now()`, `states()` und so weiter). Das Bearbeiten ändert eine Meldung, ohne dass du sie neu anlegen musst.
 
 **Eine Meldung stört Home Assistant nie.** Ist ein Text kaputt, das Ziel gelöscht oder Discord nicht erreichbar, steht eine Zeile im Protokoll, mehr passiert nicht.
 

@@ -135,6 +135,20 @@ async def test_own_texts_and_plain_messages(hass, discord):
     assert "embeds" not in payload
 
 
+async def test_texts_of_an_automation_work_too(hass, discord):
+    mock_text_channel(discord)
+    notice = notice_subentry(
+        "custom_event",
+        event_type="mein_ereignis",
+        message="{{ trigger.event.data.wer }} ruft ({{ trigger.event.event_type }})",
+    )
+    await setup_entry(hass, bot_entry([notice]))
+    hass.bus.async_fire("mein_ereignis", {"wer": "Fuchs"})
+    await settle(hass)
+    [embed] = payload_of(messages(discord)[0])["embeds"]
+    assert embed["description"] == "Fuchs ruft (mein_ereignis)"
+
+
 async def test_the_season_end_uses_the_numbers_of_the_event(hass, discord):
     mock_text_channel(discord)
     await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_season_ended")]))

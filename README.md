@@ -21,6 +21,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 | eine Nachricht ändern, löschen, anheften oder mit einem Emoji versehen | `edit_message`, `delete_message`, `pin_message`, `add_reaction` |
 | einen Thread archivieren, sperren oder umbenennen | `update_thread` |
 | die Tags eines Forums nachsehen | `list_forum_tags` |
+| Nachrichten aus Spiel Saison, Cam Profile oder Ctronics bekommen, ohne eine Automation zu schreiben | *Meldung hinzufügen* |
 | Mitglieder, Online-Status und Sprachkanäle eines Servers sehen | Sensoren, mit *Server beobachten* und *Mitglied beobachten* angelegt |
 | auf Befehle, Buttons und Reaktionen aus Discord reagieren | Ereignisse `discord_hub_command`, `discord_hub_button`, `discord_hub_reaction`, Antwort mit `respond` |
 | einfach Text schicken wie bei jeder Benachrichtigung | `notify.send_message` auf der Kanal-Entity |
@@ -38,7 +39,7 @@ Die Integration ist parallel zur eingebauten `discord`-Integration nutzbar. Beid
 
 | Art | Was du eingibst | Was du bekommst |
 |---|---|---|
-| **Bot** | der Token | ein Eintrag je Bot. Dazu fügst du **Kanäle**, **Direktnachrichten**, **Befehle**, **Server** und **Mitglieder** als Untereinträge hinzu |
+| **Bot** | der Token | ein Eintrag je Bot. Dazu fügst du **Kanäle**, **Direktnachrichten**, **Befehle**, **Server**, **Mitglieder** und **Meldungen** als Untereinträge hinzu |
 | **Webhook** | Name und Adresse (*Kanaleinstellungen → Integrationen → Webhooks → Adresse kopieren*) | ein Eintrag je Webhook mit einer `notify`-Entity. Er schreibt nur in den Kanal, zu dem er gehört |
 
 **Kanäle** (*Discord Hub → Kanal hinzufügen*): Du wählst aus den Kanälen des Servers (Text, Ankündigungen, Sprache, Forum, Media), ohne IDs abzutippen. Jeder Kanal bekommt ein Gerät mit einer `notify`-Entity. Diese Entity wählst du in den Diensten als Ziel. **Direktnachrichten** (*Direktnachrichten hinzufügen*) gehen an eine Nutzer-ID (Entwicklermodus in Discord, Rechtsklick auf den Nutzer, *Nutzer-ID kopieren*). Der Bot erreicht nur Nutzer, die mit ihm einen Server teilen.
@@ -257,17 +258,102 @@ Die Sensoren, deren Werte aus der Verbindung kommen, zeigen „nicht verfügbar�
 
 Der Sensor **Verbunden** am Gerät des Bots zeigt in seinen Attributen, wie oft und warum die Verbindung neu aufgebaut wurde: `sessions` (neue Anmeldungen), `resumes` (fortgesetzte Sitzungen), `reconnects`, `last_reason` (zum Beispiel `reconnect_requested`, wenn Discord es verlangt hat) sowie `last_connected` und `last_disconnected`. Jede Neuverbindung steht außerdem im Protokoll auf der Stufe INFO (`logger:` mit `custom_components.discord_hub: info`).
 
+## Meldungen
+
+Eine **Meldung** schickt eine Nachricht an Discord, wenn in Home Assistant etwas passiert, ohne dass du eine Automation schreibst. Du legst sie unter *Discord Hub → Meldung hinzufügen* als Untereintrag eines Bots an: Vorlage wählen, Ziel wählen, den Text bei Bedarf anpassen. Dafür muss der Bot nicht auf Discord hören, er sendet nur.
+
+### Vorlagen
+
+| Vorlage | Löst aus bei | Daten |
+|---|---|---|
+| **Spiel Saison: Aufnahme gestartet** | Ereignis `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams` |
+| **Spiel Saison: Aufnahme gestoppt** | Ereignis `spiel_saison_recording_stopped` | `partner`, `nickname`, `season`, `recording`, `place`, `reason`, `duration_s` |
+| **Spiel Saison: Saison gestartet** | Ereignis `spiel_saison_season_started` | `partner`, `season`, `start` |
+| **Spiel Saison: Saison beendet** | Ereignis `spiel_saison_season_ended` | `partner`, `nickname`, `season`, `recordings`, `seconds`, `start` |
+| **Cam Profile: Aufnahme beginnt** und **endet** | der Sensor **Aufnahme** eines Profils (oder einer Kamera) wird `on` beziehungsweise `off` | Name der Entity, Attribute wie `folder` |
+| **Cam Profile: Recorder nicht erreichbar** | der Sensor **Recorder erreichbar** wird `off` | Name der Entity |
+| **Ctronics: Bewegung** | der Sensor **Bewegung** einer Kamera wird `on` | Name der Entity, auf Wunsch mit **Schnappschuss** |
+| **Eigenes Ereignis** | ein beliebiges Ereignis auf dem Bus von Home Assistant | alle Daten des Ereignisses |
+| **Eigene Entity** | eine beliebige Entity, bei jeder Zustandsänderung oder bei einem Zustand | Name, alter und neuer Zustand |
+
+Bei Entities zählt nur ein echter Wechsel: Ein Sensor, der gerade erst entsteht, ausfällt oder aus „nicht verfügbar“ zurückkommt, löst nichts aus.
+
+### Einrichten
+
+| Feld | Bedeutung |
+|---|---|
+| **Ziel** | ein Kanal, ein Forum oder eine Direktnachricht, die du dem Bot schon hinzugefügt hast |
+| **Entity** oder **Ereignis** | die Quelle (bei den Vorlagen für Entities die Entity, bei **Eigenes Ereignis** der Name des Ereignisses) |
+| **Titel** und **Text** | Vorlagen von Home Assistant. Ein leerer Text benutzt den der Vorlage (auf Deutsch oder Englisch, je nach Sprache von Home Assistant) |
+| **Als Embed senden** | an: Titel und Text als Embed mit Farbe der Vorlage und Uhrzeit. Aus: ein Text mit fettem Titel |
+| **Schnappschuss der Kamera anhängen** und **Kamera** | hängt ein Bild an. Bei **Ctronics: Bewegung** vorbelegt: Ohne eigene Wahl kommt es von der Kamera auf demselben Gerät wie der Bewegungs-Sensor. Lässt sich das Bild nicht holen, geht die Meldung ohne Bild raus |
+| **Mindestabstand in Sekunden** | so lange wartet dieselbe Meldung nach dem Senden, bevor sie noch einmal sendet (bei Bewegung 300, bei Ereignissen von Spiel Saison 0, 0 sendet jede). Bei Entities zählt er je Meldung |
+| **Name des Threads**, **Tags**, **Ein Thread pro Tag** | nur bei einem Forum als Ziel. Der Name ist ebenfalls eine Vorlage, mit einem Thread pro Tag schreiben alle Aufrufe des Tages in denselben Thread |
+
+In Titel und Text steht die Variable `trigger`: Bei einem Ereignis hat sie dessen Daten (`trigger.season`, `trigger.partner`) und `trigger.event_type`, bei einer Entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` und `trigger.to_state` (mit `trigger.to_state.state` und `trigger.to_state.attributes.folder`). Alle Funktionen der Vorlagen von Home Assistant gehen (`now()`, `states()` und so weiter). Das Bearbeiten ändert eine Meldung, ohne dass du sie neu anlegen musst.
+
+**Eine Meldung stört Home Assistant nie.** Ist ein Text kaputt, das Ziel gelöscht oder Discord nicht erreichbar, steht eine Zeile im Protokoll, mehr passiert nicht.
+
+### Als Automation
+
+Willst du mehr Kontrolle, geht dasselbe mit einer Automation. Hier die Beispiele zu den Vorlagen:
+
+```yaml
+# Spiel Saison: Aufnahme gestartet
+triggers:
+  - trigger: event
+    event_type: spiel_saison_recording_started
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      embeds:
+        - title: "Aufnahme gestartet"
+          description: >-
+            {{ trigger.event.data.nickname }}: Saison {{ trigger.event.data.season }},
+            Aufnahme {{ trigger.event.data.recording }}
+          color: "#2ECC71"
+          timestamp: true
+```
+
+```yaml
+# Cam Profile: ein Profil beginnt die Aufnahme
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.profil_treppe_aufnahme
+    from: "off"
+    to: "on"
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      message: "{{ trigger.to_state.name }}: Aufnahme gestartet"
+```
+
+```yaml
+# Ctronics: Bewegung mit Schnappschuss, höchstens alle fünf Minuten
+mode: single
+triggers:
+  - trigger: motion.detected
+    target:
+      entity_id: binary_sensor.fuchsauge_bewegung
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      message: "Bewegung am Fuchsauge"
+      files: camera.fuchsauge
+  - delay: "00:05:00"
+```
+
 ## Grenzen
 
-- Der Bot **sendet, verwaltet, empfängt und beobachtet**. Fertige Meldungen für Spiel Saison, Cam Profile und Ctronics kommen in der nächsten Version (siehe unten).
+- Der Bot **sendet, verwaltet, empfängt, beobachtet und meldet**. Videos der Aufnahmen schickt Discord Hub nicht mit (sie sind meist größer, als Discord erlaubt), Schnappschüsse von Kameras gehen.
 - Ein Webhook kann nicht lesen und nur Nachrichten sowie Forum-Posts erzeugen. Reaktionen, Anheften, Threads ändern und Tag-Namen brauchen einen Bot.
 - Discord begrenzt Anfragen. Die Integration wartet bei einer Bremse bis zu 30 Sekunden und wiederholt dann. Ein Fehler beim Senden einer **neuen** Nachricht wird nicht wiederholt, damit nichts doppelt ankommt.
-
-## Geplant
-
-| Version | Inhalt |
-|---|---|
-| 0.4 | Zusammenspiel: Meldungen mit Vorlagen für Spiel Saison, Cam Profile und Ctronics |
 
 ## Entwicklung
 

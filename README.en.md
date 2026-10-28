@@ -21,6 +21,7 @@ It can run next to the built-in `discord` integration. Both may use the same bot
 | edit, delete, pin or react to a message | `edit_message`, `delete_message`, `pin_message`, `add_reaction` |
 | archive, lock or rename a thread | `update_thread` |
 | look up the tags of a forum | `list_forum_tags` |
+| get messages from Spiel Saison, Cam Profile or Ctronics without writing an automation | *Add a notice* |
 | see members, online status and voice channels of a server | sensors, created with *Watch a server* and *Watch a member* |
 | react to commands, buttons and reactions from Discord | events `discord_hub_command`, `discord_hub_button`, `discord_hub_reaction`, answer with `respond` |
 | just send text like any notification | `notify.send_message` on the channel entity |
@@ -38,7 +39,7 @@ It can run next to the built-in `discord` integration. Both may use the same bot
 
 | Kind | You enter | You get |
 |---|---|---|
-| **Bot** | the token | one entry per bot. You add **channels**, **direct messages**, **commands**, **servers** and **members** to it as sub-entries |
+| **Bot** | the token | one entry per bot. You add **channels**, **direct messages**, **commands**, **servers**, **members** and **notices** to it as sub-entries |
 | **Webhook** | a name and the address (*channel settings → Integrations → Webhooks → copy address*) | one entry per webhook with one `notify` entity. It writes only into the channel it belongs to |
 
 **Channels** (*Discord Hub → Add channel*): you pick from the channels of the server (text, announcement, voice, forum, media) without typing IDs. Every channel gets a device with one `notify` entity, which you choose as the target of the actions. **Direct messages** (*Add direct messages*) go to a user ID (developer mode in Discord, right click the user, *Copy user ID*). The bot can only reach users who share a server with it.
@@ -257,17 +258,102 @@ The sensors whose values come from the connection show "unavailable" when the co
 
 The **Connected** sensor on the bot's device shows in its attributes how often and why the connection was rebuilt: `sessions` (new logins), `resumes` (resumed sessions), `reconnects`, `last_reason` (for example `reconnect_requested` when Discord asked for it) as well as `last_connected` and `last_disconnected`. Every reconnect is also written to the log at INFO level (`logger:` with `custom_components.discord_hub: info`).
 
+## Notices
+
+A **notice** sends a message to Discord when something happens in Home Assistant, without you writing an automation. You add it under *Discord Hub → Add a notice* as a sub-entry of a bot: choose a template, choose a target, adjust the text if needed. The bot does not have to listen to Discord for this, it only sends.
+
+### Templates
+
+| Template | Fires on | Data |
+|---|---|---|
+| **Spiel Saison: recording started** | event `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams` |
+| **Spiel Saison: recording stopped** | event `spiel_saison_recording_stopped` | `partner`, `nickname`, `season`, `recording`, `place`, `reason`, `duration_s` |
+| **Spiel Saison: season started** | event `spiel_saison_season_started` | `partner`, `season`, `start` |
+| **Spiel Saison: season ended** | event `spiel_saison_season_ended` | `partner`, `nickname`, `season`, `recordings`, `seconds`, `start` |
+| **Cam Profile: recording starts** and **ends** | the **Recording** sensor of a profile (or a camera) turns `on` or `off` | name of the entity, attributes such as `folder` |
+| **Cam Profile: recorder unreachable** | the **Recorder reachable** sensor turns `off` | name of the entity |
+| **Ctronics: motion** | the **Motion** sensor of a camera turns `on` | name of the entity, optionally with a **snapshot** |
+| **Own event** | any event on the Home Assistant bus | all data of the event |
+| **Own entity** | any entity, on every state change or on one state | name, old and new state |
+
+For entities only a real change counts: a sensor that has just been created, drops out or returns from "unavailable" fires nothing.
+
+### Setting up
+
+| Field | Meaning |
+|---|---|
+| **Target** | a channel, a forum or a direct message you have already added to the bot |
+| **Entity** or **Event** | the source (for the entity templates the entity, for **Own event** the name of the event) |
+| **Title** and **Text** | Home Assistant templates. An empty text uses the template's (in German or English, following the language of Home Assistant) |
+| **Send as embed** | on: title and text as an embed with the template's colour and the time. Off: a text with a bold title |
+| **Attach a snapshot of the camera** and **Camera** | attaches a picture. Preset for **Ctronics: motion**: without your own choice it comes from the camera on the same device as the motion sensor. If the picture cannot be fetched, the notice goes out without it |
+| **Minimum interval in seconds** | how long the same notice waits after sending before it sends again (300 for motion, 0 for the Spiel Saison events, 0 sends every one). For entities it counts per notice |
+| **Thread name**, **Tags**, **One thread per day** | only with a forum as target. The name is a template as well, with one thread per day all calls of the day write into the same thread |
+
+In title and text the variable `trigger` is available: for an event it holds its data (`trigger.season`, `trigger.partner`) and `trigger.event_type`, for an entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` and `trigger.to_state` (with `trigger.to_state.state` and `trigger.to_state.attributes.folder`). All functions of Home Assistant templates work (`now()`, `states()` and so on). Editing changes a notice without adding it again.
+
+**A notice never disturbs Home Assistant.** If a text is broken, the target is deleted or Discord cannot be reached, one line goes into the log and nothing else happens.
+
+### As an automation
+
+If you want more control the same works with an automation. Here are the examples for the templates:
+
+```yaml
+# Spiel Saison: recording started
+triggers:
+  - trigger: event
+    event_type: spiel_saison_recording_started
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      embeds:
+        - title: "Recording started"
+          description: >-
+            {{ trigger.event.data.nickname }}: season {{ trigger.event.data.season }},
+            recording {{ trigger.event.data.recording }}
+          color: "#2ECC71"
+          timestamp: true
+```
+
+```yaml
+# Cam Profile: a profile starts recording
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.profil_treppe_aufnahme
+    from: "off"
+    to: "on"
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      message: "{{ trigger.to_state.name }}: recording started"
+```
+
+```yaml
+# Ctronics: motion with a snapshot, at most every five minutes
+mode: single
+triggers:
+  - trigger: motion.detected
+    target:
+      entity_id: binary_sensor.fuchsauge_bewegung
+actions:
+  - action: discord_hub.send_message
+    target:
+      entity_id: notify.allgemein
+    data:
+      message: "Motion at the Fuchsauge"
+      files: camera.fuchsauge
+  - delay: "00:05:00"
+```
+
 ## Limits
 
-- The bot **sends, manages, receives and watches**. Ready-made notices for Spiel Saison, Cam Profile and Ctronics come in the next version (see below).
+- The bot **sends, manages, receives, watches and notifies**. Discord Hub does not send videos of the recordings (they are mostly bigger than Discord allows), snapshots of cameras work.
 - A webhook cannot read and can only create messages and forum posts. Reactions, pinning, changing threads and tag names need a bot.
 - Discord limits requests. When it slows us down the integration waits up to 30 seconds and then retries. A failed attempt to send a **new** message is not retried, so nothing arrives twice.
-
-## Planned
-
-| Version | Content |
-|---|---|
-| 0.4 | Working together: notices with templates for Spiel Saison, Cam Profile and Ctronics |
 
 ## Development
 

@@ -219,6 +219,58 @@
         "no_guilds": "Der Bot ist noch auf keinem Server. Lade ihn zuerst mit dem OAuth2-Link aus dem Developer Portal ein.",
         "already_configured": "Dieses Mitglied wird schon beobachtet."
       }
+    },
+    "notice": {
+      "initiate_flow": {
+        "user": "Meldung hinzufügen",
+        "reconfigure": "Meldung bearbeiten"
+      },
+      "entry_type": "Meldung",
+      "step": {
+        "user": {
+          "title": "Meldung hinzufügen",
+          "description": "Eine Meldung schickt eine Nachricht an Discord, wenn in Home Assistant etwas passiert. Die Vorlage legt fest, worauf sie hört, und liefert einen fertigen Text, den du im nächsten Schritt ändern kannst.",
+          "data": {
+            "template": "Vorlage"
+          }
+        },
+        "notice": {
+          "title": "Meldung einrichten",
+          "description": "Vorlage: {template}. Titel und Text sind Vorlagen von Home Assistant, über trigger kommen die Daten des Ereignisses oder der Entity hinein (Einzelheiten stehen in der Anleitung). Ein leerer Text benutzt den Text der Vorlage. Der Schnappschuss kommt von der gewählten Kamera, bei Ctronics von der Kamera am selben Gerät. Der Mindestabstand verhindert, dass dieselbe Quelle den Kanal flutet (0 sendet jede Meldung).",
+          "data": {
+            "target": "Ziel",
+            "entity_id": "Entity",
+            "event_type": "Ereignis",
+            "state_to": "Zustand (leer: jede Änderung)",
+            "title": "Titel",
+            "message": "Text",
+            "embed": "Als Embed senden",
+            "snapshot": "Schnappschuss der Kamera anhängen",
+            "camera": "Kamera (optional)",
+            "cooldown": "Mindestabstand in Sekunden"
+          }
+        },
+        "forum": {
+          "title": "Forum-Post",
+          "description": "Das Ziel ist ein Forum. Der Name des Threads ist ebenfalls eine Vorlage von Home Assistant. Mit „Ein Thread pro Tag“ schreiben alle Meldungen des Tages in denselben Thread. Tags: Namen oder IDs.",
+          "data": {
+            "thread_name": "Name des Threads",
+            "tags": "Tags",
+            "daily": "Ein Thread pro Tag"
+          }
+        }
+      },
+      "error": {
+        "invalid_template": "Ein Text ist keine gültige Vorlage von Home Assistant. Prüfe die geschweiften Klammern.",
+        "invalid_event_type": "Gib den Namen des Ereignisses an.",
+        "camera_needed": "Für den Schnappschuss fehlt die Kamera: Wähle eine aus (am Gerät der Entity gibt es keine).",
+        "unknown_target": "Das Ziel gibt es nicht mehr. Wähle ein anderes."
+      },
+      "abort": {
+        "no_targets": "Es gibt noch keinen Kanal und keine Direktnachricht. Füge zuerst ein Ziel hinzu.",
+        "unknown_template": "Die Vorlage dieser Meldung gibt es nicht mehr.",
+        "reconfigure_successful": "Gespeichert."
+      }
     }
   },
   "services": {
@@ -604,6 +656,22 @@
     "commands_not_allowed": {
       "title": "Discord lehnt die Befehle eines Bots ab",
       "description": "Discord hat sich geweigert, die Befehle von {bot} anzulegen. Lade den Bot noch einmal mit dem Bereich „applications.commands“ ein (OAuth2 URL Generator im Developer Portal)."
+    }
+  },
+  "selector": {
+    "notice_template": {
+      "options": {
+        "spiel_saison_recording_started": "Spiel Saison: Aufnahme gestartet",
+        "spiel_saison_recording_stopped": "Spiel Saison: Aufnahme gestoppt",
+        "spiel_saison_season_started": "Spiel Saison: Saison gestartet",
+        "spiel_saison_season_ended": "Spiel Saison: Saison beendet",
+        "cam_profile_started": "Cam Profile: Aufnahme beginnt",
+        "cam_profile_stopped": "Cam Profile: Aufnahme endet",
+        "cam_profile_recorder": "Cam Profile: Recorder nicht erreichbar",
+        "ctronics_motion": "Ctronics: Bewegung",
+        "custom_event": "Eigenes Ereignis",
+        "custom_state": "Eigene Entity"
+      }
     }
   }
 }

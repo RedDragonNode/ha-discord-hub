@@ -27,6 +27,7 @@ from custom_components.discord_hub.const import (
     SUBENTRY_CHANNEL,
     SUBENTRY_COMMAND,
     SUBENTRY_MEMBER,
+    SUBENTRY_NOTICE,
     SUBENTRY_SERVER,
     SUBENTRY_USER,
 )
@@ -41,6 +42,9 @@ BOT_ID = "42"
 TEXT_ID = "100"
 FORUM_ID = "200"
 USER_ID = "300"
+TEXT_SUB = "sub-text"  # die Untereinträge von Kanal, Forum und Direktnachricht, Ziele für Meldungen
+FORUM_SUB = "sub-forum"
+USER_SUB = "sub-user"
 
 ME = {"id": BOT_ID, "username": "HA Waechter", "global_name": None, "bot": True}
 
@@ -129,18 +133,21 @@ def bot_entry(extra_subentries: list[ConfigSubentryData] | None = None, **kwargs
             ConfigSubentryData(
                 data={CONF_GUILD_ID: "1", CONF_CHANNEL_ID: TEXT_ID, CONF_CHANNEL_TYPE: 0, CONF_NAME: "allgemein"},
                 subentry_type=SUBENTRY_CHANNEL,
+                subentry_id=TEXT_SUB,
                 title="#allgemein",
                 unique_id=TEXT_ID,
             ),
             ConfigSubentryData(
                 data={CONF_GUILD_ID: "1", CONF_CHANNEL_ID: FORUM_ID, CONF_CHANNEL_TYPE: 15, CONF_NAME: "fuchs"},
                 subentry_type=SUBENTRY_CHANNEL,
+                subentry_id=FORUM_SUB,
                 title="fuchs",
                 unique_id=FORUM_ID,
             ),
             ConfigSubentryData(
                 data={CONF_USER_ID: USER_ID, CONF_NAME: "Stefan"},
                 subentry_type=SUBENTRY_USER,
+                subentry_id=USER_SUB,
                 title="Stefan",
                 unique_id=f"dm_{USER_ID}",
             ),
@@ -186,6 +193,27 @@ def member_subentry(user_id: str = "555", name: str = "Stefan", guild_id: str = 
         subentry_type=SUBENTRY_MEMBER,
         title=name,
         unique_id=f"member_{guild_id}_{user_id}",
+    )
+
+
+def notice_subentry(template: str = "custom_event", target: str = TEXT_SUB, **changes: Any) -> ConfigSubentryData:
+    """Eine Meldung mit den Vorgaben der Vorlage. `changes` überschreibt Felder."""
+    data: dict[str, Any] = {
+        "template": template,
+        "target": target,
+        "title": "",
+        "message": "",
+        "embed": True,
+        "snapshot": False,
+        "camera": "",
+        "cooldown": 0,
+        **changes,
+    }
+    return ConfigSubentryData(
+        data=data,
+        subentry_type=SUBENTRY_NOTICE,
+        subentry_id=f"notice-{template}-{target}",
+        title=f"Meldung {template}",
     )
 
 

@@ -247,4 +247,5 @@ async def test_a_webhook_has_no_subentries(hass, discord):
         "command",
         "server",
         "member",
+        "notice",
     }

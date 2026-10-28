@@ -23,6 +23,7 @@ SUBENTRY_USER = "user"
 SUBENTRY_COMMAND = "command"
 SUBENTRY_SERVER = "server"
 SUBENTRY_MEMBER = "member"
+SUBENTRY_NOTICE = "notice"
 
 # Optionen eines Bots (Hören auf Discord)
 OPT_LISTEN = "listen"
@@ -39,6 +40,23 @@ CONF_EPHEMERAL = "ephemeral"
 CONF_EVERYONE = "everyone"
 CONF_USERS = "users"
 CONF_ROLES = "roles"
+
+# Felder einer Meldung (Untereintrag)
+CONF_TEMPLATE = "template"
+CONF_TARGET = "target"
+CONF_ENTITY_ID = "entity_id"
+CONF_EVENT_TYPE = "event_type"
+CONF_STATE_TO = "state_to"
+CONF_TITLE = "title"
+CONF_MESSAGE = "message"
+CONF_EMBED = "embed"
+CONF_SNAPSHOT = "snapshot"
+CONF_CAMERA = "camera"
+CONF_COOLDOWN = "cooldown"
+CONF_THREAD_NAME = "thread_name"
+CONF_TAGS = "tags"
+CONF_DAILY = "daily"
+MAX_COOLDOWN = 86400
 
 # Ereignisse auf dem Bus von Home Assistant
 EVENT_COMMAND = f"{DOMAIN}_command"

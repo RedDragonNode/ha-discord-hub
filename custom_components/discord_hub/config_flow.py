@@ -10,13 +10,16 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
+    ConfigSubentry,
     ConfigSubentryFlow,
     OptionsFlow,
     SubentryFlowResult,
 )
 from homeassistant.core import callback
+from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.template import Template
 
 from .api import (
     BotApi,
@@ -41,24 +44,40 @@ from .const import (
     CHANNEL_FORUM,
     CHANNEL_MEDIA,
     CHANNEL_VOICE,
+    CONF_CAMERA,
     CONF_CHANNEL_ID,
     CONF_CHANNEL_TYPE,
+    CONF_COOLDOWN,
+    CONF_DAILY,
     CONF_DESCRIPTION,
+    CONF_EMBED,
+    CONF_ENTITY_ID,
     CONF_EPHEMERAL,
+    CONF_EVENT_TYPE,
     CONF_EVERYONE,
     CONF_GUILD_ID,
     CONF_KIND,
+    CONF_MESSAGE,
     CONF_NAME,
     CONF_OPTIONS,
     CONF_REPLY,
     CONF_ROLES,
+    CONF_SNAPSHOT,
+    CONF_STATE_TO,
+    CONF_TAGS,
+    CONF_TARGET,
+    CONF_TEMPLATE,
+    CONF_THREAD_NAME,
+    CONF_TITLE,
     CONF_TOKEN,
     CONF_USER_ID,
     CONF_USERS,
     CONF_WEBHOOK_URL,
     DOMAIN,
+    FORUM_CHANNELS,
     KIND_BOT,
     KIND_WEBHOOK,
+    MAX_COOLDOWN,
     OPT_ALLOWED_ROLES,
     OPT_ALLOWED_USERS,
     OPT_LISTEN,
@@ -68,9 +87,12 @@ from .const import (
     SUBENTRY_CHANNEL,
     SUBENTRY_COMMAND,
     SUBENTRY_MEMBER,
+    SUBENTRY_NOTICE,
     SUBENTRY_SERVER,
     SUBENTRY_USER,
 )
+from .notice_runner import camera_of_device
+from .notices import DEFAULT_THREAD_NAME, KIND_EVENT, KIND_STATE, TEMPLATES, NoticeTemplate, language_of
 
 _TEXT = selector.TextSelector()
 _SECRET = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD))
@@ -225,6 +247,7 @@ class DiscordHubConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_COMMAND: CommandSubentryFlow,
             SUBENTRY_SERVER: ServerSubentryFlow,
             SUBENTRY_MEMBER: MemberSubentryFlow,
+            SUBENTRY_NOTICE: NoticeSubentryFlow,
         }
 
     @classmethod
@@ -568,3 +591,225 @@ class MemberSubentryFlow(_GuildSubentryFlow):
             return str(user.get("global_name") or user["username"])
         user = member.get("user") or {}
         return str(member.get("nick") or user.get("global_name") or user.get("username") or user_id)
+
+
+# ---------------------------------------------------------------------- Meldungen
+class NoticeSubentryFlow(_BotSubentryFlow):
+    """Eine Meldung anlegen (oder bearbeiten): Vorlage, Quelle, Ziel, Text, Schnappschuss und Mindestabstand."""
+
+    _template: NoticeTemplate | None = None
+    _data: dict[str, Any]
+    _reconfigured: ConfigSubentry | None = None
+
+    # ------------------------------------------------------------------ Hilfen
+    def _targets(self) -> dict[str, ConfigSubentry]:
+        """Die Kanäle und Direktnachrichten des Bots, an die eine Meldung gehen kann."""
+        return {
+            s.subentry_id: s
+            for s in self._get_entry().subentries.values()
+            if s.subentry_type in (SUBENTRY_CHANNEL, SUBENTRY_USER)
+        }
+
+    def _is_forum(self, target_id: str) -> bool:
+        target = self._targets()[target_id]
+        return target.subentry_type == SUBENTRY_CHANNEL and int(target.data.get(CONF_CHANNEL_TYPE, 0)) in FORUM_CHANNELS
+
+    def _check_template(self, text: str) -> bool:
+        """Ist der Text eine gültige Vorlage von Home Assistant?"""
+        try:
+            Template(text, self.hass).ensure_valid()
+        except TemplateError:
+            return False
+        return True
+
+    @staticmethod
+    def _own_text(text: str, defaults: dict[str, str]) -> str:
+        """Der Text, wie er gespeichert wird: Entspricht er einem Vorgabetext, bleibt er leer und folgt der Sprache."""
+        text = text.strip()
+        return "" if text in defaults.values() else text
+
+    def _suggested(self, template: NoticeTemplate) -> dict[str, Any]:
+        language = language_of(self.hass)
+        if self._reconfigured is None:
+            return {
+                CONF_TITLE: template.title[language],
+                CONF_MESSAGE: template.message[language],
+                CONF_EMBED: True,
+                CONF_SNAPSHOT: template.snapshot,
+                CONF_COOLDOWN: template.cooldown,
+            }
+        data = dict(self._reconfigured.data)
+        data[CONF_TITLE] = data.get(CONF_TITLE) or template.title[language]
+        data[CONF_MESSAGE] = data.get(CONF_MESSAGE) or template.message[language]
+        return data
+
+    # ------------------------------------------------------------------ Schritte
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        if not self._targets():
+            return self.async_abort(reason="no_targets")
+        if user_input is not None:
+            self._template = TEMPLATES[user_input[CONF_TEMPLATE]]
+            self._data = {CONF_TEMPLATE: self._template.key}
+            return await self.async_step_notice()
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_TEMPLATE): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=list(TEMPLATES),
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                            translation_key="notice_template",
+                        )
+                    )
+                }
+            ),
+        )
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        self._reconfigured = self._get_reconfigure_subentry()
+        self._template = TEMPLATES.get(str(self._reconfigured.data.get(CONF_TEMPLATE)))
+        if self._template is None:
+            return self.async_abort(reason="unknown_template")
+        self._data = dict(self._reconfigured.data)
+        return await self.async_step_notice()
+
+    async def async_step_notice(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        template = self._template
+        assert template is not None
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data, error = self._validate(template, user_input)
+            if error:
+                errors["base"] = error
+            else:
+                self._data = data
+                if self._is_forum(data[CONF_TARGET]):
+                    return await self.async_step_forum()
+                return self._finish()
+        return self.async_show_form(
+            step_id="notice",
+            data_schema=self.add_suggested_values_to_schema(
+                self._notice_schema(template), user_input or self._suggested(template)
+            ),
+            errors=errors,
+            description_placeholders={"template": template.label[language_of(self.hass)]},
+        )
+
+    async def async_step_forum(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        language = language_of(self.hass)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            name = (user_input.get(CONF_THREAD_NAME) or "").strip()
+            if name and not self._check_template(name):
+                errors["base"] = "invalid_template"
+            else:
+                self._data |= {
+                    CONF_THREAD_NAME: self._own_text(name, DEFAULT_THREAD_NAME),
+                    CONF_TAGS: clean_ids(user_input.get(CONF_TAGS)),
+                    CONF_DAILY: bool(user_input.get(CONF_DAILY)),
+                }
+                return self._finish()
+        current = dict(self._reconfigured.data) if self._reconfigured else {}
+        suggested = user_input or {
+            CONF_THREAD_NAME: current.get(CONF_THREAD_NAME) or DEFAULT_THREAD_NAME[language],
+            CONF_TAGS: current.get(CONF_TAGS, []),
+            CONF_DAILY: current.get(CONF_DAILY, True),
+        }
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_THREAD_NAME, default=""): _TEXT,
+                vol.Optional(CONF_TAGS, default=[]): _IDS,
+                vol.Optional(CONF_DAILY, default=True): _BOOL,
+            }
+        )
+        return self.async_show_form(
+            step_id="forum",
+            data_schema=self.add_suggested_values_to_schema(schema, suggested),
+            errors=errors,
+        )
+
+    # ------------------------------------------------------------------ Formular und Prüfung
+    def _notice_schema(self, template: NoticeTemplate) -> vol.Schema:
+        targets = [selector.SelectOptionDict(value=sid, label=s.title) for sid, s in self._targets().items()]
+        fields: dict[Any, Any] = {
+            vol.Required(CONF_TARGET): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=targets, mode=selector.SelectSelectorMode.DROPDOWN)
+            )
+        }
+        if template.kind == KIND_STATE:
+            entity_filter = {
+                key: value
+                for key, value in (
+                    ("domain", template.entity_domain),
+                    ("integration", template.integration),
+                    ("device_class", template.device_class),
+                )
+                if value
+            }
+            fields[vol.Required(CONF_ENTITY_ID)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(**entity_filter)  # type: ignore[arg-type]
+            )
+            if template.key == "custom_state":
+                fields[vol.Optional(CONF_STATE_TO, default="")] = _TEXT
+        elif template.event_type is None:
+            fields[vol.Required(CONF_EVENT_TYPE)] = _TEXT
+        fields |= {
+            vol.Optional(CONF_TITLE, default=""): _TEXT,
+            vol.Optional(CONF_MESSAGE, default=""): _LONG_TEXT,
+            vol.Optional(CONF_EMBED, default=True): _BOOL,
+            vol.Optional(CONF_SNAPSHOT, default=template.snapshot): _BOOL,
+            vol.Optional(CONF_CAMERA): selector.EntitySelector(selector.EntitySelectorConfig(domain="camera")),
+            vol.Optional(CONF_COOLDOWN, default=template.cooldown): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=MAX_COOLDOWN,
+                    step=1,
+                    mode=selector.NumberSelectorMode.BOX,
+                    unit_of_measurement="s",
+                )
+            ),
+        }
+        return vol.Schema(fields)
+
+    def _validate(self, template: NoticeTemplate, user_input: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+        """(Daten der Meldung, Fehlerschlüssel). Bei einem Fehler sind die Daten leer."""
+        if user_input[CONF_TARGET] not in self._targets():
+            return {}, "unknown_target"
+        event_type = (user_input.get(CONF_EVENT_TYPE) or "").strip()
+        if template.kind == KIND_EVENT and template.event_type is None and not event_type:
+            return {}, "invalid_event_type"
+        texts = {key: (user_input.get(key) or "").strip() for key in (CONF_TITLE, CONF_MESSAGE)}
+        if not all(self._check_template(text) for text in texts.values() if text):
+            return {}, "invalid_template"
+        entity_id = user_input.get(CONF_ENTITY_ID) or ""
+        camera = user_input.get(CONF_CAMERA) or ""
+        snapshot = bool(user_input.get(CONF_SNAPSHOT))
+        if snapshot and not camera and not (template.kind == KIND_STATE and camera_of_device(self.hass, entity_id)):
+            return {}, "camera_needed"
+        data: dict[str, Any] = {
+            CONF_TEMPLATE: template.key,
+            CONF_TARGET: user_input[CONF_TARGET],
+            CONF_TITLE: self._own_text(texts[CONF_TITLE], template.title),
+            CONF_MESSAGE: self._own_text(texts[CONF_MESSAGE], template.message),
+            CONF_EMBED: bool(user_input.get(CONF_EMBED)),
+            CONF_SNAPSHOT: snapshot,
+            CONF_CAMERA: camera,
+            CONF_COOLDOWN: min(max(int(user_input.get(CONF_COOLDOWN) or 0), 0), MAX_COOLDOWN),
+        }
+        if template.kind == KIND_STATE:
+            data[CONF_ENTITY_ID] = entity_id
+            if template.key == "custom_state":
+                data[CONF_STATE_TO] = (user_input.get(CONF_STATE_TO) or "").strip()
+        elif template.event_type is None:
+            data[CONF_EVENT_TYPE] = event_type
+        return data, None
+
+    def _finish(self) -> SubentryFlowResult:
+        template = self._template
+        assert template is not None
+        target = self._targets()[self._data[CONF_TARGET]]
+        title = f"{template.label[language_of(self.hass)]} › {target.title}"
+        if self._reconfigured is not None:
+            return self.async_update_and_abort(self._get_entry(), self._reconfigured, title=title, data=self._data)
+        return self.async_create_entry(title=title, data=self._data)

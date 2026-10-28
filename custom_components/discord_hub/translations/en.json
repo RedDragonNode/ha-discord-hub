@@ -219,6 +219,58 @@
         "no_guilds": "The bot is not on any server yet. Invite it first with the OAuth2 link from the Developer Portal.",
         "already_configured": "This member is already being watched."
       }
+    },
+    "notice": {
+      "initiate_flow": {
+        "user": "Add a notice",
+        "reconfigure": "Edit notice"
+      },
+      "entry_type": "Notice",
+      "step": {
+        "user": {
+          "title": "Add a notice",
+          "description": "A notice sends a message to Discord when something happens in Home Assistant. The template decides what it listens to and brings a ready-made text that you can change in the next step.",
+          "data": {
+            "template": "Template"
+          }
+        },
+        "notice": {
+          "title": "Set up the notice",
+          "description": "Template: {template}. Title and text are Home Assistant templates, the data of the event or entity comes in through trigger (details are in the guide). An empty text uses the template's text. The snapshot comes from the camera you choose, for Ctronics from the camera on the same device. The minimum interval keeps the same source from flooding the channel (0 sends every notice).",
+          "data": {
+            "target": "Target",
+            "entity_id": "Entity",
+            "event_type": "Event",
+            "state_to": "State (empty: every change)",
+            "title": "Title",
+            "message": "Text",
+            "embed": "Send as embed",
+            "snapshot": "Attach a snapshot of the camera",
+            "camera": "Camera (optional)",
+            "cooldown": "Minimum interval in seconds"
+          }
+        },
+        "forum": {
+          "title": "Forum post",
+          "description": "The target is a forum. The thread name is a Home Assistant template as well. With \"One thread per day\" all notices of the day go into the same thread. Tags: names or IDs.",
+          "data": {
+            "thread_name": "Thread name",
+            "tags": "Tags",
+            "daily": "One thread per day"
+          }
+        }
+      },
+      "error": {
+        "invalid_template": "A text is not a valid Home Assistant template. Check the curly braces.",
+        "invalid_event_type": "Enter the name of the event.",
+        "camera_needed": "The snapshot needs a camera: choose one (the entity's device has none).",
+        "unknown_target": "The target no longer exists. Choose another one."
+      },
+      "abort": {
+        "no_targets": "There is no channel or direct message yet. Add a target first.",
+        "unknown_template": "The template of this notice no longer exists.",
+        "reconfigure_successful": "Saved."
+      }
     }
   },
   "services": {
@@ -604,6 +656,22 @@
     "commands_not_allowed": {
       "title": "Discord refuses the commands of a bot",
       "description": "Discord refused to create the commands of {bot}. Invite the bot again with the scope “applications.commands” (OAuth2 URL Generator in the Developer Portal)."
+    }
+  },
+  "selector": {
+    "notice_template": {
+      "options": {
+        "spiel_saison_recording_started": "Spiel Saison: recording started",
+        "spiel_saison_recording_stopped": "Spiel Saison: recording stopped",
+        "spiel_saison_season_started": "Spiel Saison: season started",
+        "spiel_saison_season_ended": "Spiel Saison: season ended",
+        "cam_profile_started": "Cam Profile: recording starts",
+        "cam_profile_stopped": "Cam Profile: recording ends",
+        "cam_profile_recorder": "Cam Profile: recorder unreachable",
+        "ctronics_motion": "Ctronics: motion",
+        "custom_event": "Own event",
+        "custom_state": "Own entity"
+      }
     }
   }
 }

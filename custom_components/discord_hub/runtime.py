@@ -68,6 +68,7 @@ class DiscordRuntime:
     api: BotApi | WebhookApi
     hub_device_id: str | None = None
     listener: Any = None  # der Listener des Bots (listener.py), für Webhooks None
+    notices: Any = None  # die Meldungen des Bots (notice_runner.py), für Webhooks None
     registered_commands: dict[str, dict[str, str]] = field(default_factory=dict)  # Server -> {Befehl: ID bei Discord}
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _store: Store[dict[str, Any]] = field(init=False)

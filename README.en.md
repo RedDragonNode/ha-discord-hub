@@ -288,7 +288,7 @@ For entities only a real change counts: a sensor that has just been created, dro
 | **Send as embed** | on: title and text as an embed with the template's colour and the time. Off: a text with a bold title |
 | **Attach a snapshot of the camera** and **Camera** | attaches a picture. Preset for **Ctronics: motion**: without your own choice it comes from the camera on the same device as the motion sensor. If the picture cannot be fetched, the notice goes out without it |
 | **Minimum interval in seconds** | how long the same notice waits after sending before it sends again (300 for motion, 0 for the Spiel Saison events, 0 sends every one). For entities it counts per notice |
-| **Thread name**, **Tags**, **One thread per day** | only with a forum as target. The name is a template as well, with one thread per day all calls of the day write into the same thread |
+| **Thread name**, **Tags**, **One thread per day** | only with a forum as target. The name is a template as well. With one thread per day all notices of a forum with the same name write into the same thread of the day, a different name gives its own thread |
 
 In title and text the variable `trigger` is available: for an event it holds its data (`trigger.season`, `trigger.partner`) and `trigger.event_type` (the form of an automation, `trigger.event.data.season`, works as well), for an entity `trigger.name`, `trigger.entity_id`, `trigger.from_state` and `trigger.to_state` (with `trigger.to_state.state` and `trigger.to_state.attributes.folder`). All functions of Home Assistant templates work (`now()`, `states()` and so on). Editing changes a notice without adding it again.
 

@@ -288,6 +288,32 @@ async def test_a_notice_to_a_forum_uses_the_daily_thread(hass, discord):
     assert len(messages(discord, "T1")) == 1  # der zweite Aufruf schreibt in den Thread
 
 
+async def _two_forum_notices(hass, discord, first_name: str, second_name: str) -> list:
+    discord.post(f"{API}/channels/{FORUM_ID}/threads", json={"id": "T1", "message": {"id": "M1"}})
+    discord.post(f"{API}/channels/T1/messages", json={"id": "M2", "channel_id": "T1"})
+    first = notice_subentry("custom_event", target=FORUM_SUB, event_type="ping", thread_name=first_name, daily=True)
+    second = notice_subentry("spiel_saison_season_started", target=FORUM_SUB, thread_name=second_name, daily=True)
+    await setup_entry(hass, bot_entry([first, second]))
+    hass.bus.async_fire("ping")
+    await settle(hass)
+    hass.bus.async_fire("spiel_saison_season_started", {"partner": "Fuchs", "season": 1, "start": "2026-11-01"})
+    await settle(hass)
+    return [
+        c for c in discord.mock_calls if c[0].upper() == "POST" and c[1].path.endswith(f"/channels/{FORUM_ID}/threads")
+    ]
+
+
+async def test_notices_with_the_same_thread_name_share_the_daily_thread(hass, discord):
+    threads = await _two_forum_notices(hass, discord, "Bericht", "Bericht")
+    assert len(threads) == 1
+    assert len(messages(discord, "T1")) == 1  # die zweite Meldung schreibt in den Thread der ersten
+
+
+async def test_notices_with_other_thread_names_get_their_own_threads(hass, discord):
+    threads = await _two_forum_notices(hass, discord, "Bericht", "Saison")
+    assert [payload_of(c[2])["name"] for c in threads] == ["Bericht", "Saison"]
+
+
 async def test_a_forum_notice_without_a_thread_name_gets_one_with_the_date(hass, discord):
     discord.post(f"{API}/channels/{FORUM_ID}/threads", json={"id": "T1", "message": {"id": "M1"}})
     await setup_entry(hass, bot_entry([notice_subentry("custom_event", target=FORUM_SUB, event_type="ping")]))

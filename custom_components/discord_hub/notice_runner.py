@@ -187,7 +187,7 @@ class NoticeRunner:
                 files=files,
                 tags=list(notice.tags) or None,
                 daily=notice.daily,
-                key=f"notice_{notice.subentry_id}",
+                key=f"notice_{thread_name}",  # gleicher Name im selben Forum, gleicher Tages-Thread
             )
         else:
             await self.runtime.send_message(channel_id, message=text, embeds=embeds, files=files)

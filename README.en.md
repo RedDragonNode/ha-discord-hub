@@ -266,7 +266,7 @@ A **notice** sends a message to Discord when something happens in Home Assistant
 
 | Template | Fires on | Data |
 |---|---|---|
-| **Spiel Saison: recording started** | event `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams` |
+| **Spiel Saison: recording started** | event `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams`, optionally with a **snapshot of every camera** of the recording (up to ten) |
 | **Spiel Saison: recording stopped** | event `spiel_saison_recording_stopped` | `partner`, `nickname`, `season`, `recording`, `place`, `reason`, `duration_s` |
 | **Spiel Saison: season started** | event `spiel_saison_season_started` | `partner`, `season`, `start` |
 | **Spiel Saison: season ended** | event `spiel_saison_season_ended` | `partner`, `nickname`, `season`, `recordings`, `seconds`, `start` |
@@ -286,7 +286,7 @@ For entities only a real change counts: a sensor that has just been created, dro
 | **Entity** or **Event** | the source (for the entity templates the entity, for **Own event** the name of the event) |
 | **Title** and **Text** | Home Assistant templates. An empty text uses the template's (in German or English, following the language of Home Assistant) |
 | **Send as embed** | on: title and text as an embed with the template's colour and the time. Off: a text with a bold title |
-| **Attach a snapshot of the camera** and **Camera** | attaches a picture. Preset for **Ctronics: motion**: without your own choice it comes from the camera on the same device as the motion sensor. If the picture cannot be fetched, the notice goes out without it |
+| **Attach a snapshot of the camera** and **Camera** | attaches a picture. Preset for **Ctronics: motion**: without your own choice it comes from the camera on the same device as the motion sensor. Preset for **Spiel Saison: recording started**: without your own choice every camera of the recording (`trigger.cams`) delivers a picture. If you choose a **Camera**, only its picture is sent. A picture that cannot be fetched is left out on its own, the notice goes out anyway |
 | **Minimum interval in seconds** | how long the same notice waits after sending before it sends again (300 for motion, 0 for the Spiel Saison events, 0 sends every one). For entities it counts per notice |
 | **Thread name**, **Tags**, **One thread per day** | only with a forum as target. The name is a template as well. With one thread per day all notices of a forum with the same name write into the same thread of the day, a different name gives its own thread |
 

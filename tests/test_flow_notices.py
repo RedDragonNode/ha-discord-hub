@@ -111,6 +111,16 @@ async def test_the_snapshot_needs_a_camera(hass, discord):
     assert created["data"]["camera"] == "camera.fuchsauge"
 
 
+async def test_a_recording_started_notice_takes_its_cameras_from_the_event(hass, discord):
+    entry = await setup_entry(hass, bot_entry())
+    result = await _start(hass, entry, "spiel_saison_recording_started")
+    assert _suggested(result)["snapshot"] is True  # vorbelegt, ohne feste Kamera
+    created = await hass.config_entries.subentries.async_configure(result["flow_id"], NOTICE | {"snapshot": True})
+    assert created["type"] is FlowResultType.CREATE_ENTRY
+    assert created["data"]["snapshot"] is True
+    assert created["data"]["camera"] == ""
+
+
 async def test_a_state_notice_without_a_camera_on_its_device_needs_one(hass, discord):
     entry = await setup_entry(hass, bot_entry())
     result = await _start(hass, entry, "ctronics_motion")  # der Schnappschuss ist hier vorbelegt

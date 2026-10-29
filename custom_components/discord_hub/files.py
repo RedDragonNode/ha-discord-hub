@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import mimetypes
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -15,6 +16,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import Attachment
 from .const import DOMAIN, MAX_FILE_BYTES, MAX_FILES
+
+_LOGGER = logging.getLogger(__name__)
 
 SOURCE_KEYS = ("path", "url", "camera", "media")
 
@@ -124,14 +127,21 @@ async def async_load_attachments(hass: HomeAssistant, specs: list[Any] | None) -
     attachments: list[Attachment] = []
     for raw in specs:
         spec = normalize_spec(raw)
-        if spec.get("path"):
-            name, data, content_type = await _load_path(hass, str(spec["path"]))
-        elif spec.get("url"):
-            name, data, content_type = await _load_url(hass, str(spec["url"]))
-        elif spec.get("camera"):
-            name, data, content_type = await _load_camera(hass, str(spec["camera"]))
-        else:
-            name, data, content_type = await _load_media(hass, str(spec["media"]))
+        try:
+            if spec.get("path"):
+                name, data, content_type = await _load_path(hass, str(spec["path"]))
+            elif spec.get("url"):
+                name, data, content_type = await _load_url(hass, str(spec["url"]))
+            elif spec.get("camera"):
+                name, data, content_type = await _load_camera(hass, str(spec["camera"]))
+            else:
+                name, data, content_type = await _load_media(hass, str(spec["media"]))
+        except HomeAssistantError as err:
+            if not spec.get("optional"):
+                raise
+            source = next(spec[key] for key in SOURCE_KEYS if spec.get(key))
+            _LOGGER.warning("Die Datei %s wird nicht mitgeschickt: %s", source, err)
+            continue
         filename = str(spec.get("filename") or name)
         if spec.get("spoiler") and not filename.startswith("SPOILER_"):
             filename = f"SPOILER_{filename}"

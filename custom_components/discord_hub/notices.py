@@ -54,6 +54,7 @@ class NoticeTemplate:
     integration: str | None = None
     device_class: str | None = None
     to_state: str | None = None  # Zustand, bei dem sie auslöst (None: bei jeder Änderung)
+    cams_key: str | None = None  # Feld des Ereignisses mit den Kamera-Entities, von denen je ein Schnappschuss kommt
 
 
 _SS_PARTNER = "{{ trigger.nickname or trigger.partner }}"
@@ -66,13 +67,17 @@ TEMPLATES: dict[str, NoticeTemplate] = {
             kind=KIND_EVENT,
             event_type="spiel_saison_recording_started",
             color="#2ECC71",
+            snapshot=True,
+            cams_key="cams",
             label={"de": "Spiel Saison: Aufnahme gestartet", "en": "Spiel Saison: recording started"},
             title={"de": "Aufnahme gestartet", "en": "Recording started"},
             message={
                 "de": _SS_PARTNER + ": Saison {{ trigger.season }}, Aufnahme {{ trigger.recording }}"
-                "{% if trigger.place %} in {{ trigger.place }}{% endif %}, {{ trigger.cams | length }} Kamera(s).",
+                "{% if trigger.place %} in {{ trigger.place }}{% endif %}, {{ trigger.cams | length }} Kamera(s)."
+                "{% if trigger.folder %}\nOrdner: {{ trigger.folder }}{% endif %}",
                 "en": _SS_PARTNER + ": season {{ trigger.season }}, recording {{ trigger.recording }}"
-                "{% if trigger.place %} in {{ trigger.place }}{% endif %}, {{ trigger.cams | length }} camera(s).",
+                "{% if trigger.place %} in {{ trigger.place }}{% endif %}, {{ trigger.cams | length }} camera(s)."
+                "{% if trigger.folder %}\nFolder: {{ trigger.folder }}{% endif %}",
             },
         ),
         NoticeTemplate(

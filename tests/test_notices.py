@@ -365,7 +365,67 @@ async def test_a_missing_snapshot_does_not_stop_the_notice(hass, discord, caplog
         await settle(hass)
     [body] = messages(discord)
     assert isinstance(body, dict)
-    assert "Schnappschuss" in caplog.text
+    assert "camera.fuchsauge" in caplog.text
+
+
+def _attached(body: Any) -> list[str]:
+    """Die Dateinamen, die an einer Nachricht hängen."""
+    return [field[0]["filename"] for field in body._fields[1:]]
+
+
+async def test_a_recording_started_notice_takes_a_snapshot_of_each_camera(hass, discord):
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=True)]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    cams = ["camera.pirsch", "camera.wiese", "camera.pirsch", "light.keine_kamera"]
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)) as get_image:
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=cams, folder="Spiel_Saison/Fuchs"))
+        await settle(hass)
+    assert [call.args[1] for call in get_image.await_args_list] == ["camera.pirsch", "camera.wiese"]
+    [body] = messages(discord)
+    assert _attached(body) == ["pirsch.jpg", "wiese.jpg"]
+    [embed] = payload_of(body)["embeds"]
+    assert "Folder: Spiel_Saison/Fuchs" in embed["description"]  # Tests laufen mit englischer Sprache
+
+
+async def test_a_camera_without_an_image_only_drops_its_own_snapshot(hass, discord, caplog):
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=True)]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+
+    async def get_image(_hass, entity_id):
+        if entity_id == "camera.pirsch":
+            raise HomeAssistantError("kein Bild")
+        return image
+
+    with patch.object(files.camera, "async_get_image", AsyncMock(side_effect=get_image)):
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=["camera.pirsch", "camera.wiese"]))
+        await settle(hass)
+    [body] = messages(discord)
+    assert _attached(body) == ["wiese.jpg"]
+    assert "camera.pirsch" in caplog.text
+
+
+async def test_a_chosen_camera_wins_over_the_cameras_of_the_event(hass, discord):
+    mock_text_channel(discord)
+    notice = notice_subentry("spiel_saison_recording_started", snapshot=True, camera="camera.fest")
+    await setup_entry(hass, bot_entry([notice]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)) as get_image:
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=["camera.pirsch", "camera.wiese"]))
+        await settle(hass)
+    get_image.assert_awaited_once_with(hass, "camera.fest")
+
+
+async def test_a_recording_started_notice_without_snapshots_sends_text_only(hass, discord):
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=False)]))
+    with patch.object(files.camera, "async_get_image", AsyncMock()) as get_image:
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=["camera.pirsch"]))
+        await settle(hass)
+    get_image.assert_not_awaited()
+    [body] = messages(discord)
+    assert isinstance(body, dict)
 
 
 async def test_the_camera_on_the_same_device_is_found(hass):

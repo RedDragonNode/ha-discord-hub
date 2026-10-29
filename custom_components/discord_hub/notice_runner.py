@@ -23,6 +23,7 @@ from .const import (
     CONF_CHANNEL_TYPE,
     CONF_USER_ID,
     FORUM_CHANNELS,
+    MAX_FILES,
     SUBENTRY_CHANNEL,
     SUBENTRY_USER,
 )
@@ -156,14 +157,13 @@ class NoticeRunner:
             else None
         )
         text = None if notice.embed else (f"**{title}**\n{message}" if title else message)
-        camera = self._camera(notice) if notice.snapshot else None
-        if camera:
+        # ein Bild, das sich nicht holen lässt, fällt allein weg (`optional`), die Meldung geht trotzdem raus
+        snapshots = [{"camera": camera, "optional": True} for camera in self._cameras(notice, variables)]
+        if notice.snapshot and snapshots:
             try:
-                await self._post(notice, channel_id, is_forum, thread_name, text, embeds, [{"camera": camera}])
+                await self._post(notice, channel_id, is_forum, thread_name, text, embeds, snapshots)
             except HomeAssistantError as err:
-                _LOGGER.warning(
-                    "Die Meldung %s ging mit dem Schnappschuss von %s nicht: %s", notice.template.key, camera, err
-                )
+                _LOGGER.warning("Die Meldung %s ging mit den Schnappschüssen nicht: %s", notice.template.key, err)
             else:
                 return
         await self._post(notice, channel_id, is_forum, thread_name, text, embeds, None)
@@ -209,9 +209,16 @@ class NoticeRunner:
             return str(subentry.data[CONF_CHANNEL_ID]), int(subentry.data.get(CONF_CHANNEL_TYPE, 0)) in FORUM_CHANNELS
         return None
 
-    def _camera(self, notice: NoticeConfig) -> str | None:
-        """Die Kamera für den Schnappschuss: die gewählte, sonst die am Gerät der Quelle."""
-        return notice.camera or camera_of_device(self.hass, notice.entity_id)
+    def _cameras(self, notice: NoticeConfig, variables: dict[str, Any]) -> list[str]:
+        """Die Kameras für die Schnappschüsse: die gewählte, sonst die des Ereignisses oder am Gerät der Quelle."""
+        if notice.camera:
+            return [notice.camera]
+        if key := notice.template.cams_key:
+            cams = variables["trigger"].get(key)
+            found = [cam for cam in cams if isinstance(cam, str) and cam.startswith("camera.")] if cams else []
+            return list(dict.fromkeys(found))[:MAX_FILES]
+        camera = camera_of_device(self.hass, notice.entity_id)
+        return [camera] if camera else []
 
 
 def camera_of_device(hass: HomeAssistant, entity_id: str) -> str | None:

@@ -266,7 +266,7 @@ Eine **Meldung** schickt eine Nachricht an Discord, wenn in Home Assistant etwas
 
 | Vorlage | Löst aus bei | Daten |
 |---|---|---|
-| **Spiel Saison: Aufnahme gestartet** | Ereignis `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams` |
+| **Spiel Saison: Aufnahme gestartet** | Ereignis `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams`, auf Wunsch mit einem **Schnappschuss von jeder Kamera** der Aufnahme (bis zu zehn) |
 | **Spiel Saison: Aufnahme gestoppt** | Ereignis `spiel_saison_recording_stopped` | `partner`, `nickname`, `season`, `recording`, `place`, `reason`, `duration_s` |
 | **Spiel Saison: Saison gestartet** | Ereignis `spiel_saison_season_started` | `partner`, `season`, `start` |
 | **Spiel Saison: Saison beendet** | Ereignis `spiel_saison_season_ended` | `partner`, `nickname`, `season`, `recordings`, `seconds`, `start` |
@@ -286,7 +286,7 @@ Bei Entities zählt nur ein echter Wechsel: Ein Sensor, der gerade erst entsteht
 | **Entity** oder **Ereignis** | die Quelle (bei den Vorlagen für Entities die Entity, bei **Eigenes Ereignis** der Name des Ereignisses) |
 | **Titel** und **Text** | Vorlagen von Home Assistant. Ein leerer Text benutzt den der Vorlage (auf Deutsch oder Englisch, je nach Sprache von Home Assistant) |
 | **Als Embed senden** | an: Titel und Text als Embed mit Farbe der Vorlage und Uhrzeit. Aus: ein Text mit fettem Titel |
-| **Schnappschuss der Kamera anhängen** und **Kamera** | hängt ein Bild an. Bei **Ctronics: Bewegung** vorbelegt: Ohne eigene Wahl kommt es von der Kamera auf demselben Gerät wie der Bewegungs-Sensor. Lässt sich das Bild nicht holen, geht die Meldung ohne Bild raus |
+| **Schnappschuss der Kamera anhängen** und **Kamera** | hängt ein Bild an. Bei **Ctronics: Bewegung** vorbelegt: Ohne eigene Wahl kommt es von der Kamera auf demselben Gerät wie der Bewegungs-Sensor. Bei **Spiel Saison: Aufnahme gestartet** vorbelegt: Ohne eigene Wahl kommt von jeder Kamera der Aufnahme (`trigger.cams`) ein Bild. Wählst du eine **Kamera**, kommt nur deren Bild. Lässt sich ein Bild nicht holen, fällt nur dieses weg, die Meldung geht trotzdem raus |
 | **Mindestabstand in Sekunden** | so lange wartet dieselbe Meldung nach dem Senden, bevor sie noch einmal sendet (bei Bewegung 300, bei Ereignissen von Spiel Saison 0, 0 sendet jede). Bei Entities zählt er je Meldung |
 | **Name des Threads**, **Tags**, **Ein Thread pro Tag** | nur bei einem Forum als Ziel. Der Name ist ebenfalls eine Vorlage. Mit einem Thread pro Tag schreiben alle Meldungen eines Forums mit demselben Namen in denselben Thread des Tages, ein anderer Name ergibt einen eigenen Thread |
 

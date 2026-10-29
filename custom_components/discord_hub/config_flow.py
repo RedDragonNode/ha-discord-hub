@@ -787,7 +787,8 @@ class NoticeSubentryFlow(_BotSubentryFlow):
         entity_id = user_input.get(CONF_ENTITY_ID) or ""
         camera = user_input.get(CONF_CAMERA) or ""
         snapshot = bool(user_input.get(CONF_SNAPSHOT))
-        if snapshot and not camera and not (template.kind == KIND_STATE and camera_of_device(self.hass, entity_id)):
+        has_camera = bool(template.cams_key) or (template.kind == KIND_STATE and camera_of_device(self.hass, entity_id))
+        if snapshot and not camera and not has_camera:
             return {}, "camera_needed"
         data: dict[str, Any] = {
             CONF_TEMPLATE: template.key,

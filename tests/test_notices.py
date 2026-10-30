@@ -378,14 +378,68 @@ async def test_a_recording_started_notice_takes_a_snapshot_of_each_camera(hass, 
     await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=True)]))
     image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
     cams = ["camera.pirsch", "camera.wiese", "camera.pirsch", "light.keine_kamera"]
+    hass.states.async_set("camera.pirsch", "idle", {"friendly_name": "Pirsch"})
     with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)) as get_image:
         hass.bus.async_fire("spiel_saison_recording_started", started(cams=cams, folder="Spiel_Saison/Fuchs"))
         await settle(hass)
     assert [call.args[1] for call in get_image.await_args_list] == ["camera.pirsch", "camera.wiese"]
     [body] = messages(discord)
     assert _attached(body) == ["pirsch.jpg", "wiese.jpg"]
-    [embed] = payload_of(body)["embeds"]
+    embed, *pictures = payload_of(body)["embeds"]
     assert "Folder: Spiel_Saison/Fuchs" in embed["description"]  # Tests laufen mit englischer Sprache
+    # jede Kamera hat ihr eigenes Embed mit Namen und Bild, in der Farbe der Meldung
+    assert [(p["title"], p["image"]["url"], p["color"]) for p in pictures] == [
+        ("Pirsch", "attachment://pirsch.jpg", embed["color"]),
+        ("camera.wiese", "attachment://wiese.jpg", embed["color"]),  # ohne Zustand zählt die Entity-ID als Name
+    ]
+
+
+async def test_the_color_of_the_embeds_is_the_one_of_the_template_or_an_own_one(hass, discord):
+    mock_text_channel(discord)
+    await setup_entry(
+        hass,
+        bot_entry(
+            [
+                notice_subentry("spiel_saison_recording_started", snapshot=True),
+                notice_subentry("spiel_saison_recording_stopped", color=[255, 128, 0]),
+            ]
+        ),
+    )
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)):
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=["camera.pirsch"]))
+        await settle(hass)
+        hass.bus.async_fire("spiel_saison_recording_stopped", started(duration_s=60, reason="manual"))
+        await settle(hass)
+    first, second = messages(discord)
+    assert {embed["color"] for embed in payload_of(first)["embeds"]} == {0x2ECC71}  # Vorlage: Grün
+    assert {embed["color"] for embed in payload_of(second)["embeds"]} == {0xFF8000}  # eigene Farbe
+
+
+async def test_without_an_embed_the_snapshots_are_attached_as_files(hass, discord):
+    mock_text_channel(discord)
+    notice = notice_subentry("spiel_saison_recording_started", snapshot=True, embed=False)
+    await setup_entry(hass, bot_entry([notice]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)):
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=["camera.pirsch", "camera.wiese"]))
+        await settle(hass)
+    [body] = messages(discord)
+    assert _attached(body) == ["pirsch.jpg", "wiese.jpg"]
+    assert "embeds" not in payload_of(body)
+
+
+async def test_next_to_the_text_embed_there_is_room_for_nine_cameras(hass, discord):
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=True)]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    cams = [f"camera.cam{number}" for number in range(12)]
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)):
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=cams))
+        await settle(hass)
+    [body] = messages(discord)
+    assert len(payload_of(body)["embeds"]) == 10  # das Text-Embed und neun Kameras
+    assert _attached(body) == [f"cam{number}.jpg" for number in range(9)]
 
 
 async def test_a_recording_started_notice_names_the_videos(hass, discord):

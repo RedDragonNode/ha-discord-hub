@@ -47,6 +47,7 @@ from .const import (
     CONF_CAMERA,
     CONF_CHANNEL_ID,
     CONF_CHANNEL_TYPE,
+    CONF_COLOR,
     CONF_COOLDOWN,
     CONF_DAILY,
     CONF_DESCRIPTION,
@@ -92,7 +93,7 @@ from .const import (
     SUBENTRY_USER,
 )
 from .notice_runner import camera_of_device
-from .notices import DEFAULT_THREAD_NAME, KIND_EVENT, KIND_STATE, TEMPLATES, NoticeTemplate, language_of
+from .notices import DEFAULT_THREAD_NAME, KIND_EVENT, KIND_STATE, TEMPLATES, NoticeTemplate, color_of, language_of
 
 _TEXT = selector.TextSelector()
 _SECRET = selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD))
@@ -643,6 +644,8 @@ class NoticeSubentryFlow(_BotSubentryFlow):
         data[CONF_MESSAGE] = data.get(CONF_MESSAGE) or template.message[language]
         if not data.get(CONF_CAMERA):
             data.pop(CONF_CAMERA, None)  # eine leere Kamera als Vorschlag lehnt die Auswahl beim Abschicken ab
+        if not color_of(data.get(CONF_COLOR)):
+            data.pop(CONF_COLOR, None)  # ebenso eine leere Farbe
         return data
 
     # ------------------------------------------------------------------ Schritte
@@ -760,6 +763,7 @@ class NoticeSubentryFlow(_BotSubentryFlow):
             vol.Optional(CONF_TITLE, default=""): _TEXT,
             vol.Optional(CONF_MESSAGE, default=""): _LONG_TEXT,
             vol.Optional(CONF_EMBED, default=True): _BOOL,
+            vol.Optional(CONF_COLOR): selector.ColorRGBSelector(),
             vol.Optional(CONF_SNAPSHOT, default=template.snapshot): _BOOL,
             vol.Optional(CONF_CAMERA): selector.EntitySelector(selector.EntitySelectorConfig(domain="camera")),
             vol.Optional(CONF_COOLDOWN, default=template.cooldown): selector.NumberSelector(
@@ -796,6 +800,7 @@ class NoticeSubentryFlow(_BotSubentryFlow):
             CONF_TITLE: self._own_text(texts[CONF_TITLE], template.title),
             CONF_MESSAGE: self._own_text(texts[CONF_MESSAGE], template.message),
             CONF_EMBED: bool(user_input.get(CONF_EMBED)),
+            CONF_COLOR: list(color_of(user_input.get(CONF_COLOR)) or ()),
             CONF_SNAPSHOT: snapshot,
             CONF_CAMERA: camera,
             CONF_COOLDOWN: min(max(int(user_input.get(CONF_COOLDOWN) or 0), 0), MAX_COOLDOWN),

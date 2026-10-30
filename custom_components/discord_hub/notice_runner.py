@@ -6,6 +6,7 @@ passiert nicht. Mit einem Mindestabstand fluten häufige Quellen (Bewegung) den 
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Callable
@@ -18,15 +19,18 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.template import Template
 
+from .api import Attachment
 from .const import (
     CONF_CHANNEL_ID,
     CONF_CHANNEL_TYPE,
     CONF_USER_ID,
     FORUM_CHANNELS,
+    MAX_EMBEDS,
     MAX_FILES,
     SUBENTRY_CHANNEL,
     SUBENTRY_USER,
 )
+from .files import async_load_attachments
 from .notices import DEFAULT_THREAD_NAME, KIND_EVENT, NoticeConfig, language_of, notices_of
 
 if TYPE_CHECKING:
@@ -151,22 +155,47 @@ class NoticeRunner:
         if target is None:
             return
         channel_id, is_forum = target
-        embeds = (
-            [{"title": title, "description": message, "color": notice.template.color, "timestamp": True}]
-            if notice.embed
-            else None
-        )
+        main = {"title": title, "description": message, "color": notice.embed_color, "timestamp": True}
         text = None if notice.embed else (f"**{title}**\n{message}" if title else message)
-        # ein Bild, das sich nicht holen lässt, fällt allein weg (`optional`), die Meldung geht trotzdem raus
-        snapshots = [{"camera": camera, "optional": True} for camera in self._cameras(notice, variables)]
-        if notice.snapshot and snapshots:
+        snapshots = await self._snapshots(notice, variables) if notice.snapshot else []
+        if snapshots:
+            # als Embed bekommt jede Kamera ihr eigenes in der Farbe der Meldung, sonst hängen die Bilder an
+            embeds = [main, *self._picture_embeds(notice, snapshots)] if notice.embed else None
             try:
-                await self._post(notice, channel_id, is_forum, thread_name, text, embeds, snapshots)
+                await self._post(
+                    notice, channel_id, is_forum, thread_name, text, embeds, [file for _, file in snapshots]
+                )
             except HomeAssistantError as err:
                 _LOGGER.warning("Die Meldung %s ging mit den Schnappschüssen nicht: %s", notice.template.key, err)
             else:
                 return
-        await self._post(notice, channel_id, is_forum, thread_name, text, embeds, None)
+        await self._post(notice, channel_id, is_forum, thread_name, text, [main] if notice.embed else None, None)
+
+    async def _snapshots(self, notice: NoticeConfig, variables: dict[str, Any]) -> list[tuple[str, Attachment]]:
+        """Die Bilder der Kameras als (Kamera, Datei), alle zugleich. Ein Bild, das fehlt, fällt allein weg."""
+        limit = MAX_EMBEDS - 1 if notice.embed else MAX_FILES  # neben dem Text-Embed bleibt Platz für neun
+        cameras = self._cameras(notice, variables)[:limit]
+        results = await asyncio.gather(*(self._snapshot(notice, camera) for camera in cameras))
+        return [result for result in results if result]
+
+    async def _snapshot(self, notice: NoticeConfig, camera: str) -> tuple[str, Attachment] | None:
+        try:
+            [file] = await async_load_attachments(self.hass, [{"camera": camera}])
+        except HomeAssistantError as err:
+            _LOGGER.warning("Der Schnappschuss von %s fehlt in der Meldung %s: %s", camera, notice.template.key, err)
+            return None
+        return camera, file
+
+    def _picture_embeds(self, notice: NoticeConfig, snapshots: list[tuple[str, Attachment]]) -> list[dict[str, Any]]:
+        """Je Kamera ein Embed mit ihrem Namen und ihrem Bild."""
+        return [
+            {
+                "title": state.name if (state := self.hass.states.get(camera)) else camera,
+                "color": notice.embed_color,
+                "image": f"attachment://{file.filename}",
+            }
+            for camera, file in snapshots
+        ]
 
     async def _post(
         self,
@@ -176,7 +205,7 @@ class NoticeRunner:
         thread_name: str,
         text: str | None,
         embeds: list[dict[str, Any]] | None,
-        files: list[dict[str, str]] | None,
+        files: list[Attachment] | None,
     ) -> None:
         if is_forum:
             await self.runtime.forum_post(

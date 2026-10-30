@@ -236,7 +236,7 @@
         },
         "notice": {
           "title": "Meldung einrichten",
-          "description": "Vorlage: {template}. Titel und Text sind Vorlagen von Home Assistant, über trigger kommen die Daten des Ereignisses oder der Entity hinein (Einzelheiten stehen in der Anleitung). Ein leerer Text benutzt den Text der Vorlage. Der Schnappschuss kommt von der gewählten Kamera, bei Ctronics von der Kamera am selben Gerät, bei Spiel Saison (Aufnahme gestartet) von jeder Kamera der Aufnahme. Der Mindestabstand verhindert, dass dieselbe Quelle den Kanal flutet (0 sendet jede Meldung).",
+          "description": "Vorlage: {template}. Titel und Text sind Vorlagen von Home Assistant, über trigger kommen die Daten des Ereignisses oder der Entity hinein (Einzelheiten stehen in der Anleitung). Ein leerer Text benutzt den Text der Vorlage. Der Schnappschuss kommt von der gewählten Kamera, bei Ctronics von der Kamera am selben Gerät, bei Spiel Saison (Aufnahme gestartet) von jeder Kamera der Aufnahme. Als Embed bekommt jede Kamera ein eigenes Embed mit ihrem Bild, die Farbe gilt für alle Embeds der Meldung (Schwarz, die Vorgabe der Auswahl, nimmt die Farbe der Vorlage). Der Mindestabstand verhindert, dass dieselbe Quelle den Kanal flutet (0 sendet jede Meldung).",
           "data": {
             "target": "Ziel",
             "entity_id": "Entity",
@@ -245,6 +245,7 @@
             "title": "Titel",
             "message": "Text",
             "embed": "Als Embed senden",
+            "color": "Farbe der Embeds",
             "snapshot": "Schnappschuss der Kamera anhängen",
             "camera": "Kamera (optional)",
             "cooldown": "Mindestabstand in Sekunden"

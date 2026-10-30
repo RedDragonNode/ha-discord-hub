@@ -236,7 +236,7 @@
         },
         "notice": {
           "title": "Set up the notice",
-          "description": "Template: {template}. Title and text are Home Assistant templates, the data of the event or entity comes in through trigger (details are in the guide). An empty text uses the template's text. The snapshot comes from the camera you choose, for Ctronics from the camera on the same device, for Spiel Saison (recording started) from every camera of the recording. The minimum interval keeps the same source from flooding the channel (0 sends every notice).",
+          "description": "Template: {template}. Title and text are Home Assistant templates, the data of the event or entity comes in through trigger (details are in the guide). An empty text uses the template's text. The snapshot comes from the camera you choose, for Ctronics from the camera on the same device, for Spiel Saison (recording started) from every camera of the recording. As an embed every camera gets an embed of its own with its picture, the color applies to all embeds of the notice (black, the default of the picker, uses the color of the template). The minimum interval keeps the same source from flooding the channel (0 sends every notice).",
           "data": {
             "target": "Target",
             "entity_id": "Entity",
@@ -245,6 +245,7 @@
             "title": "Title",
             "message": "Text",
             "embed": "Send as embed",
+            "color": "Color of the embeds",
             "snapshot": "Attach a snapshot of the camera",
             "camera": "Camera (optional)",
             "cooldown": "Minimum interval in seconds"

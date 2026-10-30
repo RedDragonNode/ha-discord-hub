@@ -44,10 +44,35 @@ async def test_add_a_notice_with_the_texts_of_the_template(hass, discord):
         "title": "",
         "message": "",
         "embed": True,
+        "color": [],
         "snapshot": False,
         "camera": "",
         "cooldown": 30,
     }
+
+
+async def test_an_own_color_is_kept_and_black_means_the_color_of_the_template(hass, discord):
+    entry = await setup_entry(hass, bot_entry())
+    result = await _start(hass, entry, "spiel_saison_recording_started")
+    created = await hass.config_entries.subentries.async_configure(result["flow_id"], NOTICE | {"color": [255, 128, 0]})
+    assert created["data"]["color"] == [255, 128, 0]
+    result = await _start(hass, entry, "spiel_saison_recording_stopped")
+    black = await hass.config_entries.subentries.async_configure(result["flow_id"], NOTICE | {"color": [0, 0, 0]})
+    assert black["data"]["color"] == []  # Schwarz ist die Vorgabe der Auswahl
+
+
+async def test_reconfigure_shows_the_own_color(hass, discord):
+    entry = await setup_entry(hass, bot_entry([notice_subentry("custom_event", event_type="x", color=[10, 20, 30])]))
+    sub = next(s for s in entry.subentries.values() if s.subentry_type == "notice")
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "notice"), context={"source": SOURCE_RECONFIGURE, "subentry_id": sub.subentry_id}
+    )
+    suggested = _suggested(result)
+    assert suggested["color"] == [10, 20, 30]
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], suggested)
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    assert entry.subentries[sub.subentry_id].data["color"] == [10, 20, 30]
 
 
 async def test_a_changed_text_is_kept(hass, discord):
@@ -230,6 +255,7 @@ async def test_reconfigure_sends_back_what_the_form_suggests(hass, discord):
     )
     suggested = _suggested(result)
     assert "camera" not in suggested  # eine leere Kamera lehnt die Auswahl ab
+    assert "color" not in suggested  # eine leere Farbe ebenso
     result = await hass.config_entries.subentries.async_configure(result["flow_id"], suggested)
     assert result["reason"] == "reconfigure_successful"
     await hass.async_block_till_done()

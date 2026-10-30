@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_CAMERA,
+    CONF_COLOR,
     CONF_COOLDOWN,
     CONF_DAILY,
     CONF_EMBED,
@@ -241,6 +242,12 @@ class NoticeConfig:
     thread_name: str
     tags: tuple[str, ...]
     daily: bool
+    color: tuple[int, int, int] | None = None  # eigene Farbe der Embeds, sonst die der Vorlage
+
+    @property
+    def embed_color(self) -> str | list[int]:
+        """Die Farbe der Embeds: die eigene, sonst die der Vorlage."""
+        return list(self.color) if self.color else self.template.color
 
     @property
     def listens_to(self) -> str:
@@ -256,6 +263,17 @@ class NoticeConfig:
         """`title` oder `message`: der eigene Text, sonst der der Vorlage."""
         own = getattr(self, field)
         return own or getattr(self.template, field)[language]
+
+
+def color_of(value: Any) -> tuple[int, int, int] | None:
+    """Die eigene Farbe als (r, g, b). Nichts oder Schwarz (die Vorgabe der Auswahl) heißt: die Farbe der Vorlage."""
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        return None
+    try:
+        red, green, blue = (min(max(int(part), 0), 255) for part in value)
+    except (TypeError, ValueError):
+        return None
+    return None if (red, green, blue) == (0, 0, 0) else (red, green, blue)
 
 
 def parse_notice(subentry_id: str, data: dict[str, Any]) -> NoticeConfig | None:
@@ -279,6 +297,7 @@ def parse_notice(subentry_id: str, data: dict[str, Any]) -> NoticeConfig | None:
         thread_name=str(data.get(CONF_THREAD_NAME) or ""),
         tags=tuple(str(tag) for tag in data.get(CONF_TAGS) or []),
         daily=bool(data.get(CONF_DAILY, True)),
+        color=color_of(data.get(CONF_COLOR)),
     )
 
 

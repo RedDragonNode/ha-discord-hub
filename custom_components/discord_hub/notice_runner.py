@@ -191,7 +191,7 @@ class NoticeRunner:
         return [
             {
                 "title": state.name if (state := self.hass.states.get(camera)) else camera,
-                "color": notice.embed_color,
+                "color": notice.camera_color(camera),
                 "image": f"attachment://{file.filename}",
             }
             for camera, file in snapshots

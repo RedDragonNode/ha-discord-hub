@@ -45,6 +45,7 @@ async def test_add_a_notice_with_the_texts_of_the_template(hass, discord):
         "message": "",
         "embed": True,
         "color": [],
+        "camera_colors": [],
         "snapshot": False,
         "camera": "",
         "cooldown": 30,
@@ -59,6 +60,48 @@ async def test_an_own_color_is_kept_and_black_means_the_color_of_the_template(ha
     result = await _start(hass, entry, "spiel_saison_recording_stopped")
     black = await hass.config_entries.subentries.async_configure(result["flow_id"], NOTICE | {"color": [0, 0, 0]})
     assert black["data"]["color"] == []  # Schwarz ist die Vorgabe der Auswahl
+
+
+async def test_a_color_per_camera_is_kept(hass, discord):
+    entry = await setup_entry(hass, bot_entry())
+    result = await _start(hass, entry, "spiel_saison_recording_started")
+    colors = [
+        {"camera": "camera.pirsch", "color": [0, 128, 255]},
+        {"camera": "camera.wiese", "color": [255, 0, 0]},
+        {"camera": "camera.pirsch", "color": [0, 255, 0]},  # eine Kamera gilt einmal, die letzte Angabe
+        {"camera": "camera.schwarz", "color": [0, 0, 0]},  # Schwarz heißt: keine eigene Farbe
+    ]
+    created = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], NOTICE | {"camera_colors": colors}
+    )
+    assert created["data"]["camera_colors"] == [
+        {"camera": "camera.pirsch", "color": [0, 255, 0]},
+        {"camera": "camera.wiese", "color": [255, 0, 0]},
+    ]
+
+
+async def test_a_color_per_camera_needs_a_camera_and_a_color(hass, discord):
+    entry = await setup_entry(hass, bot_entry())
+    result = await _start(hass, entry, "spiel_saison_recording_started")
+    with pytest.raises(InvalidData):
+        await hass.config_entries.subentries.async_configure(
+            result["flow_id"], NOTICE | {"camera_colors": [{"camera": "camera.pirsch"}]}
+        )
+
+
+async def test_reconfigure_shows_the_colors_per_camera(hass, discord):
+    colors = [{"camera": "camera.pirsch", "color": [0, 128, 255]}]
+    entry = await setup_entry(hass, bot_entry([notice_subentry("custom_event", event_type="x", camera_colors=colors)]))
+    sub = next(s for s in entry.subentries.values() if s.subentry_type == "notice")
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "notice"), context={"source": SOURCE_RECONFIGURE, "subentry_id": sub.subentry_id}
+    )
+    suggested = _suggested(result)
+    assert suggested["camera_colors"] == colors
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], suggested)
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    assert entry.subentries[sub.subentry_id].data["camera_colors"] == colors
 
 
 async def test_reconfigure_shows_the_own_color(hass, discord):
@@ -256,6 +299,7 @@ async def test_reconfigure_sends_back_what_the_form_suggests(hass, discord):
     suggested = _suggested(result)
     assert "camera" not in suggested  # eine leere Kamera lehnt die Auswahl ab
     assert "color" not in suggested  # eine leere Farbe ebenso
+    assert "camera_colors" not in suggested  # und eine leere Liste
     result = await hass.config_entries.subentries.async_configure(result["flow_id"], suggested)
     assert result["reason"] == "reconfigure_successful"
     await hass.async_block_till_done()

@@ -16,7 +16,14 @@ from homeassistant.helpers import entity_registry as er
 
 from custom_components.discord_hub import files, notice_runner
 from custom_components.discord_hub.notice_runner import camera_of_device
-from custom_components.discord_hub.notices import TEMPLATES, NoticeTemplate, language_of, parse_notice
+from custom_components.discord_hub.notices import (
+    TEMPLATES,
+    NoticeTemplate,
+    camera_colors_of,
+    color_of,
+    language_of,
+    parse_notice,
+)
 
 from .conftest import (
     API,
@@ -414,6 +421,32 @@ async def test_the_color_of_the_embeds_is_the_one_of_the_template_or_an_own_one(
     first, second = messages(discord)
     assert {embed["color"] for embed in payload_of(first)["embeds"]} == {0x2ECC71}  # Vorlage: Grün
     assert {embed["color"] for embed in payload_of(second)["embeds"]} == {0xFF8000}  # eigene Farbe
+
+
+async def test_a_camera_can_have_a_color_of_its_own(hass, discord):
+    mock_text_channel(discord)
+    colors = [{"camera": "camera.pirsch", "color": [0, 128, 255]}]
+    notice = notice_subentry("spiel_saison_recording_started", snapshot=True, camera_colors=colors)
+    await setup_entry(hass, bot_entry([notice]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)):
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=["camera.pirsch", "camera.wiese"]))
+        await settle(hass)
+    [body] = messages(discord)
+    text, pirsch, wiese = payload_of(body)["embeds"]
+    assert (text["color"], pirsch["color"], wiese["color"]) == (0x2ECC71, 0x0080FF, 0x2ECC71)  # die übrigen: Vorlage
+
+
+def test_the_colors_of_a_notice_are_read_carefully() -> None:
+    assert color_of([255, 128, 0]) == (255, 128, 0)
+    assert color_of([300, -5, 7.0]) == (255, 0, 7)  # in den Bereich gezwungen
+    assert color_of([0, 0, 0]) is None  # Schwarz ist die Vorgabe der Auswahl
+    assert color_of(None) is None
+    assert color_of("#FF8800") is None
+    assert color_of(["a", 1, 2]) is None
+    assert camera_colors_of(None) == ()
+    assert camera_colors_of(["kaputt", {"camera": "light.x", "color": [1, 2, 3]}, {"camera": "camera.a"}]) == ()
+    assert camera_colors_of([{"camera": "camera.a", "color": [1, 2, 3]}]) == (("camera.a", (1, 2, 3)),)
 
 
 async def test_without_an_embed_the_snapshots_are_attached_as_files(hass, discord):

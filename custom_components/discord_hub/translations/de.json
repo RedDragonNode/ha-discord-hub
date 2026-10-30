@@ -236,7 +236,7 @@
         },
         "notice": {
           "title": "Meldung einrichten",
-          "description": "Vorlage: {template}. Titel und Text sind Vorlagen von Home Assistant, über trigger kommen die Daten des Ereignisses oder der Entity hinein (Einzelheiten stehen in der Anleitung). Ein leerer Text benutzt den Text der Vorlage. Der Schnappschuss kommt von der gewählten Kamera, bei Ctronics von der Kamera am selben Gerät, bei Spiel Saison (Aufnahme gestartet) von jeder Kamera der Aufnahme. Als Embed bekommt jede Kamera ein eigenes Embed mit ihrem Bild, die Farbe gilt für alle Embeds der Meldung (Schwarz, die Vorgabe der Auswahl, nimmt die Farbe der Vorlage). Der Mindestabstand verhindert, dass dieselbe Quelle den Kanal flutet (0 sendet jede Meldung).",
+          "description": "Vorlage: {template}. Titel und Text sind Vorlagen von Home Assistant, über trigger kommen die Daten des Ereignisses oder der Entity hinein (Einzelheiten stehen in der Anleitung). Ein leerer Text benutzt den Text der Vorlage. Der Schnappschuss kommt von der gewählten Kamera, bei Ctronics von der Kamera am selben Gerät, bei Spiel Saison (Aufnahme gestartet) von jeder Kamera der Aufnahme. Als Embed bekommt jede Kamera ein eigenes Embed mit ihrem Bild, die Farbe gilt für alle Embeds der Meldung (Schwarz, die Vorgabe der Auswahl, nimmt die Farbe der Vorlage). Mit „Farbe je Kamera“ bekommt eine Kamera ihr eigenes Embed in einer eigenen Farbe, die übrigen Kameras nehmen die Farbe der Meldung. Der Mindestabstand verhindert, dass dieselbe Quelle den Kanal flutet (0 sendet jede Meldung).",
           "data": {
             "target": "Ziel",
             "entity_id": "Entity",
@@ -246,6 +246,7 @@
             "message": "Text",
             "embed": "Als Embed senden",
             "color": "Farbe der Embeds",
+            "camera_colors": "Farbe je Kamera",
             "snapshot": "Schnappschuss der Kamera anhängen",
             "camera": "Kamera (optional)",
             "cooldown": "Mindestabstand in Sekunden"
@@ -660,6 +661,18 @@
     }
   },
   "selector": {
+    "camera_color": {
+      "fields": {
+        "camera": {
+          "name": "Kamera",
+          "description": "Die Kamera, deren Embed diese Farbe bekommt."
+        },
+        "color": {
+          "name": "Farbe",
+          "description": "Die Farbe des Embeds dieser Kamera."
+        }
+      }
+    },
     "notice_template": {
       "options": {
         "spiel_saison_recording_started": "Spiel Saison: Aufnahme gestartet",

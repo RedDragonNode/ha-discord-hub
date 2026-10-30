@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_CAMERA,
+    CONF_CAMERA_COLORS,
     CONF_COLOR,
     CONF_COOLDOWN,
     CONF_DAILY,
@@ -243,11 +244,17 @@ class NoticeConfig:
     tags: tuple[str, ...]
     daily: bool
     color: tuple[int, int, int] | None = None  # eigene Farbe der Embeds, sonst die der Vorlage
+    camera_colors: tuple[tuple[str, tuple[int, int, int]], ...] = ()  # eigene Farbe je Kamera
 
     @property
     def embed_color(self) -> str | list[int]:
         """Die Farbe der Embeds: die eigene, sonst die der Vorlage."""
         return list(self.color) if self.color else self.template.color
+
+    def camera_color(self, camera: str) -> str | list[int]:
+        """Die Farbe des Embeds einer Kamera: ihre eigene, sonst die der Meldung."""
+        own = dict(self.camera_colors).get(camera)
+        return list(own) if own else self.embed_color
 
     @property
     def listens_to(self) -> str:
@@ -276,6 +283,19 @@ def color_of(value: Any) -> tuple[int, int, int] | None:
     return None if (red, green, blue) == (0, 0, 0) else (red, green, blue)
 
 
+def camera_colors_of(value: Any) -> tuple[tuple[str, tuple[int, int, int]], ...]:
+    """Die Farben je Kamera aus einer Liste von `{"camera": …, "color": [r, g, b]}`. Eine Kamera gilt einmal (die
+    letzte Angabe), Einträge ohne Kamera oder ohne eigene Farbe fallen weg."""
+    found: dict[str, tuple[int, int, int]] = {}
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            continue
+        camera = str(item.get("camera") or "").strip()
+        if camera.startswith("camera.") and (color := color_of(item.get("color"))):
+            found[camera] = color
+    return tuple(found.items())
+
+
 def parse_notice(subentry_id: str, data: dict[str, Any]) -> NoticeConfig | None:
     """Eine Meldung aus den Daten eines Untereintrags. Eine unbekannte Vorlage ergibt None."""
     template = TEMPLATES.get(str(data.get(CONF_TEMPLATE)))
@@ -298,6 +318,7 @@ def parse_notice(subentry_id: str, data: dict[str, Any]) -> NoticeConfig | None:
         tags=tuple(str(tag) for tag in data.get(CONF_TAGS) or []),
         daily=bool(data.get(CONF_DAILY, True)),
         color=color_of(data.get(CONF_COLOR)),
+        camera_colors=camera_colors_of(data.get(CONF_CAMERA_COLORS)),
     )
 
 

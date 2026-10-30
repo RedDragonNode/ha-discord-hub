@@ -266,7 +266,7 @@ Eine **Meldung** schickt eine Nachricht an Discord, wenn in Home Assistant etwas
 
 | Vorlage | Löst aus bei | Daten |
 |---|---|---|
-| **Spiel Saison: Aufnahme gestartet** | Ereignis `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams`, auf Wunsch mit einem **Schnappschuss von jeder Kamera** der Aufnahme (bis zu zehn) |
+| **Spiel Saison: Aufnahme gestartet** | Ereignis `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams`, `session` und `files` (die zwei letzten ab Spiel Saison 0.14.0, `files` nennt die Videos als Liste mit `cam` und `name`, ohne Endung), auf Wunsch mit einem **Schnappschuss von jeder Kamera** der Aufnahme (bis zu zehn) |
 | **Spiel Saison: Aufnahme gestoppt** | Ereignis `spiel_saison_recording_stopped` | `partner`, `nickname`, `season`, `recording`, `place`, `reason`, `duration_s` |
 | **Spiel Saison: Saison gestartet** | Ereignis `spiel_saison_season_started` | `partner`, `season`, `start` |
 | **Spiel Saison: Saison beendet** | Ereignis `spiel_saison_season_ended` | `partner`, `nickname`, `season`, `recordings`, `seconds`, `start` |

@@ -266,7 +266,7 @@ A **notice** sends a message to Discord when something happens in Home Assistant
 
 | Template | Fires on | Data |
 |---|---|---|
-| **Spiel Saison: recording started** | event `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams`, optionally with a **snapshot of every camera** of the recording (up to ten) |
+| **Spiel Saison: recording started** | event `spiel_saison_recording_started` | `partner`, `nickname`, `season`, `recording`, `place`, `folder`, `cams`, `session` and `files` (the last two from Spiel Saison 0.14.0, `files` names the videos as a list with `cam` and `name`, without extension), optionally with a **snapshot of every camera** of the recording (up to ten) |
 | **Spiel Saison: recording stopped** | event `spiel_saison_recording_stopped` | `partner`, `nickname`, `season`, `recording`, `place`, `reason`, `duration_s` |
 | **Spiel Saison: season started** | event `spiel_saison_season_started` | `partner`, `season`, `start` |
 | **Spiel Saison: season ended** | event `spiel_saison_season_ended` | `partner`, `nickname`, `season`, `recordings`, `seconds`, `start` |

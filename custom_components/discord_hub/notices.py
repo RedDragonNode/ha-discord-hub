@@ -74,10 +74,14 @@ TEMPLATES: dict[str, NoticeTemplate] = {
             message={
                 "de": _SS_PARTNER + ": Saison {{ trigger.season }}, Aufnahme {{ trigger.recording }}"
                 "{% if trigger.place %} in {{ trigger.place }}{% endif %}, {{ trigger.cams | length }} Kamera(s)."
-                "{% if trigger.folder %}\nOrdner: {{ trigger.folder }}{% endif %}",
+                "{% if trigger.folder %}\nOrdner: {{ trigger.folder }}{% endif %}"
+                "{% if trigger.files %}\nVideos:"
+                "{% for file in trigger.files %}\n• {{ file['name'] }}{% endfor %}{% endif %}",
                 "en": _SS_PARTNER + ": season {{ trigger.season }}, recording {{ trigger.recording }}"
                 "{% if trigger.place %} in {{ trigger.place }}{% endif %}, {{ trigger.cams | length }} camera(s)."
-                "{% if trigger.folder %}\nFolder: {{ trigger.folder }}{% endif %}",
+                "{% if trigger.folder %}\nFolder: {{ trigger.folder }}{% endif %}"
+                "{% if trigger.files %}\nVideos:"
+                "{% for file in trigger.files %}\n• {{ file['name'] }}{% endfor %}{% endif %}",
             },
         ),
         NoticeTemplate(

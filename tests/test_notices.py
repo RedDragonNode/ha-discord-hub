@@ -388,6 +388,35 @@ async def test_a_recording_started_notice_takes_a_snapshot_of_each_camera(hass, 
     assert "Folder: Spiel_Saison/Fuchs" in embed["description"]  # Tests laufen mit englischer Sprache
 
 
+async def test_a_recording_started_notice_names_the_videos(hass, discord):
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=False)]))
+    files_of_event = [
+        {"cam": "camera.pirsch", "name": "#02.03.07.Cam ID.Pirsch 28.10.2026"},
+        {"cam": "camera.wiese", "name": "#02.03.07.Cam ID.Wiese 28.10.2026"},
+    ]
+    hass.bus.async_fire(
+        "spiel_saison_recording_started",
+        started(cams=["camera.pirsch", "camera.wiese"], folder="Spiel_Saison/Fuchs", files=files_of_event)
+        | {"session": "Fuchs Saison 03 Aufnahme 07"},
+    )
+    await settle(hass)
+    [embed] = payload_of(messages(discord)[0])["embeds"]
+    assert embed["description"].endswith(
+        "Videos:\n• #02.03.07.Cam ID.Pirsch 28.10.2026\n• #02.03.07.Cam ID.Wiese 28.10.2026"
+    )
+
+
+async def test_a_recording_started_notice_without_file_names_stays_short(hass, discord):
+    mock_text_channel(discord)  # eine ältere Spiel Saison schickt noch keine `files`
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=False)]))
+    hass.bus.async_fire("spiel_saison_recording_started", started(folder="Spiel_Saison/Fuchs"))
+    await settle(hass)
+    [embed] = payload_of(messages(discord)[0])["embeds"]
+    assert "Videos" not in embed["description"]
+    assert embed["description"].endswith("Folder: Spiel_Saison/Fuchs")
+
+
 async def test_a_camera_without_an_image_only_drops_its_own_snapshot(hass, discord, caplog):
     mock_text_channel(discord)
     await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=True)]))

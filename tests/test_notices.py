@@ -127,6 +127,26 @@ async def test_the_texts_follow_the_language(hass, discord):
     assert embed["description"] == "Fuchs: Saison 3, Aufnahme 7, 2 Kamera(s)."
 
 
+@pytest.mark.parametrize(
+    ("language", "start", "text"),
+    [
+        ("de", "2026-10-31", "Fuchs: Saison 2 beginnt am 31.10.2026."),
+        ("de", "morgen", "Fuchs: Saison 2 beginnt am morgen."),
+        ("en", "2026-10-31", "Fuchs: season 2 begins on 2026-10-31."),
+    ],
+)
+async def test_the_date_of_a_new_season_is_written_in_the_language_of_home_assistant(
+    hass, discord, language: str, start: str, text: str
+):
+    hass.config.language = language
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_season_started")]))
+    hass.bus.async_fire("spiel_saison_season_started", {"partner": "Fuchs", "season": 2, "start": start})
+    await settle(hass)
+    [embed] = payload_of(messages(discord)[0])["embeds"]
+    assert embed["description"] == text
+
+
 async def test_own_texts_and_plain_messages(hass, discord):
     mock_text_channel(discord)
     notice = notice_subentry(

@@ -108,7 +108,9 @@ TEMPLATES: dict[str, NoticeTemplate] = {
             label={"de": "Spiel Saison: Saison gestartet", "en": "Spiel Saison: season started"},
             title={"de": "Neue Saison", "en": "New season"},
             message={
-                "de": "{{ trigger.partner }}: Saison {{ trigger.season }} beginnt am {{ trigger.start }}.",
+                "de": "{{ trigger.partner }}: Saison {{ trigger.season }} beginnt am "
+                "{% set day = strptime(trigger.start | string, '%Y-%m-%d', none) %}"
+                "{{ day.strftime('%d.%m.%Y') if day else trigger.start }}.",
                 "en": "{{ trigger.partner }}: season {{ trigger.season }} begins on {{ trigger.start }}.",
             },
         ),

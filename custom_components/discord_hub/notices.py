@@ -57,6 +57,7 @@ class NoticeTemplate:
     device_class: str | None = None
     to_state: str | None = None  # Zustand, bei dem sie auslöst (None: bei jeder Änderung)
     cams_key: str | None = None  # Feld des Ereignisses mit den Kamera-Entities, von denen je ein Schnappschuss kommt
+    files_key: str | None = None  # Feld des Ereignisses mit {"cam", "name"} je Kamera, der Name steht unter ihrem Bild
 
 
 _SS_PARTNER = "{{ trigger.nickname or trigger.partner }}"
@@ -71,6 +72,7 @@ TEMPLATES: dict[str, NoticeTemplate] = {
             color="#2ECC71",
             snapshot=True,
             cams_key="cams",
+            files_key="files",
             label={"de": "Spiel Saison: Aufnahme gestartet", "en": "Spiel Saison: recording started"},
             title={"de": "Aufnahme gestartet", "en": "Recording started"},
             message={

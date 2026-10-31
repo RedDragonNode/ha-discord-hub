@@ -514,6 +514,30 @@ async def test_a_recording_started_notice_names_the_videos(hass, discord):
     )
 
 
+async def test_the_embed_of_a_camera_names_its_video(hass, discord):
+    mock_text_channel(discord)
+    await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=True)]))
+    image = SimpleNamespace(content=b"\xff\xd8jpeg", content_type="image/jpeg")
+    hass.states.async_set("camera.pirsch", "idle", {"friendly_name": "Pirsch"})
+    # zu `camera.keine` gibt es keinen Namen, und ein kaputter Eintrag stört nicht
+    files_of_event = [
+        {"cam": "camera.wiese", "name": "#02.03.07.WI 28.10.2026"},
+        {"cam": "camera.pirsch", "name": "#02.03.07.PI 28.10.2026"},
+        {"cam": "camera.leer", "name": ""},
+        "kein Eintrag",
+    ]
+    cams = ["camera.pirsch", "camera.wiese", "camera.keine"]
+    with patch.object(files.camera, "async_get_image", AsyncMock(return_value=image)):
+        hass.bus.async_fire("spiel_saison_recording_started", started(cams=cams, files=files_of_event))
+        await settle(hass)
+    _, *pictures = payload_of(messages(discord)[0])["embeds"]
+    assert [(p["title"], p.get("description")) for p in pictures] == [
+        ("Pirsch", "#02.03.07.PI 28.10.2026"),
+        ("camera.wiese", "#02.03.07.WI 28.10.2026"),
+        ("camera.keine", None),
+    ]
+
+
 async def test_a_recording_started_notice_without_file_names_stays_short(hass, discord):
     mock_text_channel(discord)  # eine ältere Spiel Saison schickt noch keine `files`
     await setup_entry(hass, bot_entry([notice_subentry("spiel_saison_recording_started", snapshot=False)]))

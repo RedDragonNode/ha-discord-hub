@@ -160,7 +160,8 @@ class NoticeRunner:
         snapshots = await self._snapshots(notice, variables) if notice.snapshot else []
         if snapshots:
             # als Embed bekommt jede Kamera ihr eigenes in der Farbe der Meldung, sonst hängen die Bilder an
-            embeds = [main, *self._picture_embeds(notice, snapshots)] if notice.embed else None
+            pictures = self._picture_embeds(notice, snapshots, variables) if notice.embed else []
+            embeds = [main, *pictures] if notice.embed else None
             try:
                 await self._post(
                     notice, channel_id, is_forum, thread_name, text, embeds, [file for _, file in snapshots]
@@ -186,16 +187,32 @@ class NoticeRunner:
             return None
         return camera, file
 
-    def _picture_embeds(self, notice: NoticeConfig, snapshots: list[tuple[str, Attachment]]) -> list[dict[str, Any]]:
-        """Je Kamera ein Embed mit ihrem Namen und ihrem Bild."""
+    def _picture_embeds(
+        self, notice: NoticeConfig, snapshots: list[tuple[str, Attachment]], variables: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Je Kamera ein Embed mit ihrem Namen, darunter dem Namen ihres Videos, und ihrem Bild."""
+        videos = self._video_names(notice, variables)
         return [
             {
                 "title": state.name if (state := self.hass.states.get(camera)) else camera,
+                **({"description": videos[camera]} if camera in videos else {}),
                 "color": notice.camera_color(camera),
                 "image": f"attachment://{file.filename}",
             }
             for camera, file in snapshots
         ]
+
+    @staticmethod
+    def _video_names(notice: NoticeConfig, variables: dict[str, Any]) -> dict[str, str]:
+        """Der Name des Videos je Kamera aus dem Ereignis. Ohne ein solches Feld (ältere Quelle) ist es leer."""
+        files = variables["trigger"].get(notice.template.files_key) if notice.template.files_key else None
+        if not isinstance(files, list):
+            return {}
+        return {
+            str(item["cam"]): str(item["name"])
+            for item in files
+            if isinstance(item, dict) and item.get("cam") and item.get("name")
+        }
 
     async def _post(
         self,
